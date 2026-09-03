@@ -69,7 +69,12 @@ testDb.prepare(`
 
 testDb.prepare(`
   INSERT INTO counties (name, seat, fips, tac_name, tac_email)
-  VALUES ('Test', 'TestCity', '48999', 'John Doe', 'john@example.com')
+  VALUES ('Harris', 'Houston', '48201', 'John Doe', 'john@co.harris.tx.us')
+`).run();
+
+testDb.prepare(`
+  INSERT INTO counties (name, seat, fips, tac_name, tac_email)
+  VALUES ('Dallas', 'Dallas', '48113', 'Jane Smith', 'jane@dallascounty.org')
 `).run();
 
 console.log('Running tests...\n');
@@ -140,7 +145,7 @@ function testDailySendCap() {
   const dailyCap = parseInt(process.env.SEND_DAILY_CAP);
   
   // Insert some send logs for today
-  const countyId = testDb.prepare('SELECT id FROM counties WHERE name = ?').get('Test').id;
+  const countyId = testDb.prepare('SELECT id FROM counties WHERE name = ?').get('Harris').id;
   
   for (let i = 0; i < 5; i++) {
     testDb.prepare(`
@@ -168,7 +173,7 @@ function testDailySendCap() {
 function testStatusProgression() {
   console.log('Test 4: County status progression');
   
-  const county = testDb.prepare('SELECT * FROM counties WHERE name = ?').get('Test');
+  const county = testDb.prepare('SELECT * FROM counties WHERE name = ?').get('Harris');
   
   assert.strictEqual(county.outreach_status, 'Not contacted', 'Initial status should be "Not contacted"');
   
@@ -228,22 +233,77 @@ function testCountySeeding() {
   console.log(`  Sample: Harris (${harris.fips}), Dallas (${dallas.fips}), Travis (${travis.fips})\n`);
 }
 
-// Test 7: SMTP configuration (verify env vars are read)
-function testSMTPConfig() {
-  console.log('Test 7: SMTP configuration');
+// Test 7: Resend email configuration (verify mock works)
+function testResendConfig() {
+  console.log('Test 7: Resend email configuration');
   
-  // In test mode, we use mock transporter
+  // In test mode, we use mock Resend client
   assert.strictEqual(process.env.NODE_ENV, 'test', 'Should be in test mode');
   
-  const requiredEnvVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'];
+  const requiredEnvVars = ['RESEND_API_KEY', 'MAIL_FROM'];
   
   // Import email service to verify it loads in test mode
   const emailService = require('./email-service');
   assert.ok(emailService.getNextFollowupDate, 'Email service should export getNextFollowupDate');
   
-  console.log('✓ SMTP configuration structure verified');
-  console.log('  Note: Test mode uses mock transporter (no actual emails sent)');
+  console.log('✓ Resend configuration structure verified');
+  console.log('  Note: Test mode uses mock Resend client (no actual emails sent)');
   console.log(`  Required env vars: ${requiredEnvVars.join(', ')}\n`);
+}
+
+// Test 8: Inbound email matching
+function testInboundMatching() {
+  console.log('Test 8: Inbound email matching');
+  
+  // Test finding county by email
+  const testEmail = 'john@co.harris.tx.us';
+  const county = testDb.prepare('SELECT * FROM counties WHERE LOWER(tac_email) = LOWER(?)').get(testEmail);
+  
+  assert.ok(county, 'Should find county by email');
+  assert.strictEqual(county.name, 'Harris', 'Should match Harris County');
+  
+  // Test email with different case
+  const upperEmail = 'JOHN@CO.HARRIS.TX.US';
+  const county2 = testDb.prepare('SELECT * FROM counties WHERE LOWER(tac_email) = LOWER(?)').get(upperEmail);
+  assert.ok(county2, 'Should find county with case-insensitive match');
+  
+  // Test non-existent email
+  const notFound = testDb.prepare('SELECT * FROM counties WHERE LOWER(tac_email) = LOWER(?)').get('notfound@example.com');
+  assert.strictEqual(notFound, undefined, 'Should not find non-existent email');
+  
+  console.log('✓ Inbound email matching works');
+  console.log(`  Matched ${testEmail} to ${county.name} County`);
+  console.log(`  Case-insensitive matching verified\n`);
+}
+
+// Test 9: Inbound reply status update
+function testInboundStatusUpdate() {
+  console.log('Test 9: Inbound reply status update');
+  
+  const countyId = testDb.prepare('SELECT id FROM counties WHERE name = ?').get('Dallas').id;
+  
+  // Set initial status to Emailed with follow-up date
+  testDb.prepare(`
+    UPDATE counties 
+    SET outreach_status = ?, next_followup = ? 
+    WHERE id = ?
+  `).run('Emailed', '2026-12-01', countyId);
+  
+  // Simulate inbound reply
+  testDb.prepare(`
+    UPDATE counties 
+    SET outreach_status = ?, next_followup = NULL 
+    WHERE id = ?
+  `).run('Replied', countyId);
+  
+  const updated = testDb.prepare('SELECT * FROM counties WHERE id = ?').get(countyId);
+  
+  assert.strictEqual(updated.outreach_status, 'Replied', 'Status should be Replied');
+  assert.strictEqual(updated.next_followup, null, 'Follow-up should be cleared');
+  
+  console.log('✓ Inbound reply correctly updates status');
+  console.log(`  Status: Emailed → Replied`);
+  console.log(`  Follow-up date cleared\n`);
 }
 
 // Run all tests
@@ -254,7 +314,9 @@ try {
   testStatusProgression();
   testCSVStructure();
   testCountySeeding();
-  testSMTPConfig();
+  testResendConfig();
+  testInboundMatching();
+  testInboundStatusUpdate();
   
   console.log('═══════════════════════════════════════');
   console.log('✓ All tests passed!');

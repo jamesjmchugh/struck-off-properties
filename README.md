@@ -1,40 +1,45 @@
-# Texas Struck-off Property CRM
+# Wild Boar Creek CRM
 
 A micro CRM for managing outreach to Texas county tax assessor-collectors regarding struck-off and tax-trust property inventories.
 
 ## Overview
 
-This app helps manage email outreach to all 254 Texas counties on a ~90-day follow-up cadence. It tracks contact information, outreach status, and maintains a send log while respecting daily send limits.
+This staff-only application helps James McHugh manage email outreach to all 254 Texas counties on a ~90-day follow-up cadence. It tracks contact information, outreach status, and maintains a send log while respecting daily send limits.
 
 **Key Features:**
 - Pre-seeded with all 254 Texas counties (including FIPS codes)
 - CSV import for tax assessor-collector contact information
 - Email template with merge fields (county, TAC name, TAC email)
-- SMTP-only email sending (works with cPanel/NixiHost mailboxes)
+- **Resend HTTP API** for email sending (no SMTP, no Gmail, no Google)
 - Daily send cap (default: 5 emails per day)
-- Automatic follow-up scheduling (90 days after send)
+- Automatic 90-day follow-up scheduling
+- Inbound webhook for email replies (auto-marks counties as "Replied")
 - Pipeline tracking: Not contacted → Emailed → Replied → List received → Offer in play → Closed
-- Simple password authentication
+- Email + password authentication
 - SQLite database (no hosted database required)
+- Production-ready with systemd + nginx configuration
 
 ## IMPORTANT: Email Configuration
 
-**This app uses SMTP ONLY.** It is designed to work with cPanel/NixiHost mailboxes and similar hosting providers.
+**This app uses Resend HTTP API ONLY.** No SMTP. No Gmail. No Google APIs. No Google OAuth.
 
-**DO NOT USE:**
-- Gmail
-- Google APIs
-- Google OAuth
-- Any Google mail integration
+### Why Resend?
 
-**Use SMTP from your own domain mailbox.**
+- **HTTP API** - Simple REST calls, no SMTP complexity
+- **Domain sending** - Sends from james@wildboarcreek.com
+- **Inbound webhooks** - Automatically processes replies
+- **Better deliverability** - SPF/DKIM/DMARC configured at the domain level
+- **No Gmail dependency** - Completely independent from Google
+
+Get your API key at [resend.com/api-keys](https://resend.com/api-keys).
 
 ## Installation
 
 ### Prerequisites
 - Node.js 16+ and npm
+- Resend account with verified domain (wildboarcreek.com)
 
-### Setup
+### Local Development Setup
 
 1. Clone this repository and install dependencies:
 ```bash
@@ -48,46 +53,29 @@ cp .env.example .env
 
 3. Edit `.env` and configure your settings:
 ```bash
-# Set your app password (used for login)
-APP_PASSWORD=your_secure_password_here
+# Staff Authentication
+STAFF_EMAIL=james@wildboarcreek.com
+STAFF_PASSWORD=your_secure_password_here
 
-# SMTP Settings for cPanel/NixiHost mailbox
-# For cPanel: host is typically mail.yourdomain.tld
-SMTP_HOST=mail.yourdomain.tld
-SMTP_PORT=465
-SMTP_SECURE=true
-SMTP_USER=james@yourdomain.tld
-SMTP_PASS=your_email_password
-SMTP_FROM=james@yourdomain.tld
-SMTP_FROM_NAME=James McHugh
+# Resend Email API
+RESEND_API_KEY=re_your_resend_api_key_here
+MAIL_FROM=james@wildboarcreek.com
 
-# Daily send limit (default: 5)
+# Send Limits
 SEND_DAILY_CAP=5
+
+# Follow-up Auto-send (default: false)
+# Set to true ONLY if you want 90-day follow-ups to send automatically
+FOLLOWUP_AUTOSEND=false
+
+# Inbound Webhook Secret
+WEBHOOK_SECRET=your_random_webhook_secret_here
+
+# App Settings
+PORT=3000
+NODE_ENV=development
+SESSION_SECRET=your_random_session_secret_here
 ```
-
-### cPanel/NixiHost SMTP Configuration
-
-For cPanel or NixiHost email accounts, use these typical settings:
-
-**SSL (Recommended):**
-- Host: `mail.yourdomain.tld`
-- Port: `465`
-- Secure: `true`
-
-**STARTTLS (Alternative):**
-- Host: `mail.yourdomain.tld`
-- Port: `587`
-- Secure: `false` (STARTTLS will be used)
-
-**Finding Your Mail Server:**
-1. Log into cPanel
-2. Go to Email Accounts
-3. Look for "Mail Client Configuration" or "Configure Email Client"
-4. Use the server hostname shown (typically `mail.yourdomain.tld`)
-
-**Authentication:**
-- Username: Your full email address (e.g., `james@yourdomain.tld`)
-- Password: Your email account password
 
 4. Seed the database with all 254 Texas counties:
 ```bash
@@ -99,15 +87,29 @@ npm run seed
 npm run dev
 ```
 
-6. Open your browser to `http://localhost:3000` and login with your `APP_PASSWORD`.
+6. Open your browser to `http://localhost:3000/login` and login with your staff email and password.
 
 ## Usage
 
 ### First Time Setup
 
 1. After seeding, all 254 Texas counties will be in the database with "Not contacted" status
-2. Import TAC contact information using CSV (see CSV Import section)
-3. Customize the email template if needed (Templates menu)
+2. **Review and customize the email template** (Templates menu) - James must sign off on this before any emails are sent
+3. Import TAC contact information using CSV (see CSV Import section below)
+
+### Important: Email Sending Rules
+
+**The first 254 outreach emails MUST only send when James clicks "Send" on a specific county.**
+
+- No bulk blast button
+- No automatic sends on the initial wave
+- Preview required before every send
+- Daily cap enforced (default: 5)
+
+**90-day follow-ups:**
+- Automatically scheduled (next_follow_up = sent_at + 90 days)
+- Will NOT auto-send unless `FOLLOWUP_AUTOSEND=true` (default: false)
+- Follow-ups appear in the "Due Follow-up" queue for manual review
 
 ### Sending Emails
 
@@ -156,7 +158,7 @@ Download a sample CSV from the Import page in the app.
 
 1. **Not contacted** - Initial state, no outreach yet
 2. **Emailed** - Email sent, awaiting response
-3. **Replied** - TAC responded to inquiry
+3. **Replied** - TAC responded to inquiry (auto-set via inbound webhook)
 4. **List received** - Received struck-off inventory list
 5. **Offer in play** - Submitted offer on property/properties
 6. **Closed** - Deal completed or outreach ended
@@ -169,7 +171,54 @@ The default template includes:
 - Questions about title trust and Texas Tax Code §34.05
 - Request for offer submission process
 
-Edit the template via the "Edit Email Template" link on the dashboard.
+**Important:** James should review and customize this template before sending any emails. Edit via the "Edit Email Template" link on the dashboard.
+
+### Inbound Email Handling
+
+When a TAC replies to an outreach email, the CRM automatically:
+1. Receives the reply via Resend's inbound webhook (`POST /inbound`)
+2. Matches the sender email to the county
+3. Updates the county status to "Replied"
+4. Clears the follow-up date (no need to follow up if they replied)
+
+**Setup:** Configure in your Resend dashboard under Domains → wildboarcreek.com → Inbound.
+
+## Production Deployment
+
+This app is designed to sit behind `https://wildboarcreek.com/login/` on a NixiHost VPS, while the public Wild Boar Creek landing page remains at the root.
+
+### Architecture
+
+- **Public homepage:** Nginx serves static files at `/` (the Wild Boar Creek ranch page)
+- **CRM login:** Nginx proxies `/login` to Node app on `127.0.0.1:3000`
+- **CRM app:** Nginx proxies `/app/*` to Node app
+- **Inbound webhook:** Nginx proxies `/inbound` to Node app
+
+See `deployment/DEPLOYMENT.md` for complete production setup instructions including:
+- Systemd service configuration
+- Nginx reverse proxy setup
+- SSL certificate configuration
+- Environment variable setup
+- Database seeding
+
+Quick deployment:
+```bash
+# Install and seed
+npm install --production
+npm run seed
+
+# Configure systemd service
+sudo cp deployment/wildboarcreek-crm.service /etc/systemd/system/
+sudo systemctl enable wildboarcreek-crm
+sudo systemctl start wildboarcreek-crm
+
+# Configure nginx
+sudo cp deployment/nginx-wildboarcreek.conf /etc/nginx/sites-available/wildboarcreek.com
+# Edit paths in config, then:
+sudo ln -s /etc/nginx/sites-available/wildboarcreek.com /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
 
 ## Testing
 
@@ -185,31 +234,65 @@ Tests verify:
 - Daily send cap enforcement
 - All 254 Texas counties are seeded with FIPS codes
 - CSV structure validation
-- SMTP configuration (uses mock transporter in test mode)
+- Resend configuration (uses mock client in test mode)
+- Inbound email matching (case-insensitive)
+- Reply status updates
+
+**Important:** Tests use a mock Resend client. No actual emails are sent during testing.
 
 ## Security Notes
 
-- **Authentication**: Simple password-based login via `APP_PASSWORD` environment variable
-- **SMTP Credentials**: Never commit your `.env` file (it's in `.gitignore`)
-- **No Email in Tests**: Tests use a mock transporter; no actual emails are sent during testing
-- If exposing this app to the internet, use a strong password and consider additional security measures
+- **Authentication**: Email + password login via `STAFF_EMAIL` and `STAFF_PASSWORD` environment variables
+- **Session cookies**: httpOnly, secure in production
+- **Resend API key**: Never commit to repository (in `.gitignore`)
+- **Webhook secret**: Validates inbound POST requests from Resend
+- **Localhost binding**: In production, app binds to `127.0.0.1` (not public)
+- **Nginx proxy**: Public access only via specific routes (`/login`, `/app`, `/inbound`)
+
+If exposing this app, ensure:
+- Strong `STAFF_PASSWORD` and `SESSION_SECRET`
+- HTTPS enforced via Nginx
+- `WEBHOOK_SECRET` matches Resend configuration
+- Regular database backups
 
 ## Project Structure
 
 ```
 .
-├── server.js              # Express server and routes
+├── server.js              # Express server with all routes and UI
 ├── database.js            # SQLite database layer
-├── email-service.js       # SMTP email sending logic
-├── test.js               # Test suite
+├── email-service.js       # Resend email sending and template merging
 ├── scripts/
-│   └── seed.js           # County seeding script (all 254 Texas counties)
+│   └── seed.js           # Seeds all 254 Texas counties with FIPS codes
+├── test.js               # Test suite (9 tests)
 ├── public/
-│   └── styles.css        # UI styles
-├── package.json          # Dependencies
+│   └── styles.css        # UI styles (Wild Boar Creek branding)
+├── deployment/
+│   ├── wildboarcreek-crm.service  # Systemd service unit
+│   ├── nginx-wildboarcreek.conf   # Nginx configuration
+│   └── DEPLOYMENT.md              # Production deployment guide
+├── package.json          # Dependencies and scripts
 ├── .env.example          # Environment template
 └── README.md             # This file
 ```
+
+## Environment Variables
+
+### Required
+
+- `STAFF_EMAIL` - Staff login email (default: james@wildboarcreek.com)
+- `STAFF_PASSWORD` - Staff login password
+- `RESEND_API_KEY` - Resend API key (get from resend.com)
+- `MAIL_FROM` - Sender email address (james@wildboarcreek.com)
+
+### Optional
+
+- `SEND_DAILY_CAP` - Daily send limit (default: 5)
+- `FOLLOWUP_AUTOSEND` - Auto-send 90-day follow-ups (default: false)
+- `WEBHOOK_SECRET` - Inbound webhook authentication
+- `PORT` - Server port (default: 3000)
+- `NODE_ENV` - Environment (development/production/test)
+- `SESSION_SECRET` - Session cookie secret
 
 ## Development
 
@@ -220,19 +303,13 @@ npm run dev
 
 **Production mode:**
 ```bash
-npm start
+NODE_ENV=production npm start
 ```
 
-## Deployment
-
-This app is designed to run locally but can be deployed to any Node.js hosting environment:
-
-1. Set environment variables on your hosting platform
-2. Run `npm install --production`
-3. Run `npm run seed` to initialize the database
-4. Run `npm start`
-
-The SQLite database (`crm.db`) will be created in the project root. Back it up regularly.
+**Run tests:**
+```bash
+npm test
+```
 
 ## Texas Counties
 
@@ -243,20 +320,76 @@ All 254 Texas counties are pre-configured with:
 
 FIPS codes follow the official U.S. Census Bureau standard for Texas (state code 48).
 
-## Why SMTP-Only?
+## Why No Gmail / Google?
 
-This app is built for **paced, human-controlled outreach** using a mailbox you own and control:
-- Sends from your domain (better deliverability)
-- No OAuth complexity or API limits
-- Works with standard cPanel/NixiHost hosting
+This app is built for **paced, human-controlled outreach** using a mailbox on your own domain:
+
+✅ **Resend advantages:**
+- HTTP API (no SMTP complexity)
+- Better deliverability (domain-based)
+- Inbound webhook support
+- No OAuth complexity
 - Full control over sending behavior
-- No dependency on third-party services
 
-**Never use this with Gmail or automated bulk sending services.**
+❌ **Never use:**
+- Gmail SMTP
+- Google APIs
+- Google OAuth
+- Any Google mail integration
+- Automated bulk sending services
+
+**This is a deliberate design choice** to ensure proper outreach practices and maintain sender reputation.
+
+## Maintenance
+
+### View Logs
+
+```bash
+# Application logs (production)
+sudo journalctl -u wildboarcreek-crm -f
+```
+
+### Restart Service
+
+```bash
+sudo systemctl restart wildboarcreek-crm
+```
+
+### Backup Database
+
+```bash
+# Backup crm.db regularly
+cp crm.db crm-backup-$(date +%Y%m%d).db
+```
+
+The SQLite database (`crm.db`) contains all counties, contacts, and send history. Back it up regularly.
+
+## Troubleshooting
+
+**Can't login:**
+- Check `STAFF_EMAIL` and `STAFF_PASSWORD` in `.env`
+- Verify session secret is set
+
+**Emails not sending:**
+- Verify `RESEND_API_KEY` is valid
+- Check Resend dashboard for delivery status
+- Look for errors in application logs
+
+**Inbound webhook not working:**
+- Verify `WEBHOOK_SECRET` matches Resend configuration
+- Check Resend dashboard → Domains → Inbound settings
+- Test webhook with curl (see DEPLOYMENT.md)
+
+**Daily cap not resetting:**
+- Cap resets at midnight UTC
+- Check system timezone
 
 ## Support
 
-For issues or questions, refer to the code comments or raise an issue in the repository.
+For issues or questions, refer to:
+- Code comments in source files
+- `deployment/DEPLOYMENT.md` for production setup
+- Test suite (`test.js`) for examples
 
 ## License
 

@@ -117,6 +117,11 @@ function getCountyByName(name) {
   return db.prepare('SELECT * FROM counties WHERE name = ?').get(name);
 }
 
+// Get county by TAC email
+function getCountyByEmail(email) {
+  return db.prepare('SELECT * FROM counties WHERE LOWER(tac_email) = LOWER(?)').get(email);
+}
+
 // Update county
 function updateCounty(id, data) {
   const fields = [];
@@ -206,6 +211,7 @@ module.exports = {
   getCounties,
   getCountyById,
   getCountyByName,
+  getCountyByEmail,
   updateCounty,
   getSendLogs,
   addSendLog,

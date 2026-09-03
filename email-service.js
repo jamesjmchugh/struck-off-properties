@@ -1,39 +1,30 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const { getEmailTemplate, addSendLog, updateCounty } = require('./database');
 
-// SMTP Configuration from environment variables
-const SMTP_CONFIG = {
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '465'),
-  secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-};
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const FROM_EMAIL = process.env.MAIL_FROM || 'james@wildboarcreek.com';
 
-const FROM_EMAIL = process.env.SMTP_FROM;
-const FROM_NAME = process.env.SMTP_FROM_NAME || 'James McHugh';
-
-// Create transporter
-function createTransporter() {
-  // In development/test mode, return a mock transporter
-  if (process.env.NODE_ENV === 'test' || !SMTP_CONFIG.host) {
-    console.log('Using mock email transporter (no actual emails will be sent)');
+// Create Resend client
+function getResendClient() {
+  // In development/test mode, return a mock client
+  if (process.env.NODE_ENV === 'test' || !RESEND_API_KEY) {
+    console.log('Using mock email client (no actual emails will be sent)');
     return {
-      sendMail: async (mailOptions) => {
-        console.log('MOCK EMAIL:', {
-          from: mailOptions.from,
-          to: mailOptions.to,
-          subject: mailOptions.subject,
-          body_length: mailOptions.text.length
-        });
-        return { messageId: 'mock-' + Date.now() };
+      emails: {
+        send: async (payload) => {
+          console.log('MOCK EMAIL:', {
+            from: payload.from,
+            to: payload.to,
+            subject: payload.subject,
+            text_length: payload.text ? payload.text.length : 0
+          });
+          return { id: 'mock-' + Date.now() };
+        }
       }
     };
   }
 
-  return nodemailer.createTransport(SMTP_CONFIG);
+  return new Resend(RESEND_API_KEY);
 }
 
 // Merge template with county data
@@ -65,25 +56,25 @@ function getNextFollowupDate() {
   return followup.toISOString().split('T')[0]; // YYYY-MM-DD format
 }
 
-// Send email to county
+// Send email to county via Resend
 async function sendEmail(county) {
   if (!county.tac_email) {
     throw new Error('No TAC email address');
   }
 
   const { subject, body } = mergeTemplate(county);
-  const transporter = createTransporter();
+  const resend = getResendClient();
 
-  const mailOptions = {
-    from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
+  const payload = {
+    from: FROM_EMAIL,
     to: county.tac_email,
     subject: subject,
     text: body
   };
 
-  // Send the email
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`Email sent to ${county.name} County: ${info.messageId}`);
+  // Send the email via Resend
+  const result = await resend.emails.send(payload);
+  console.log(`Email sent to ${county.name} County via Resend: ${result.id}`);
 
   // Log the send
   const today = new Date().toISOString().split('T')[0];
@@ -98,7 +89,7 @@ async function sendEmail(county) {
     next_followup: nextFollowup
   });
 
-  return info;
+  return result;
 }
 
 module.exports = {

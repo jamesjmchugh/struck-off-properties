@@ -9,17 +9,21 @@
     "test": "node test.js",
     "seed": "node scripts/seed.js"
   },
-  "keywords": ["crm", "texas", "property-tax"],
+  "keywords": [
+    "crm",
+    "texas",
+    "property-tax"
+  ],
   "author": "James McHugh",
   "license": "ISC",
   "dependencies": {
+    "better-sqlite3": "^9.2.2",
+    "csv-parse": "^5.5.2",
+    "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
-    "better-sqlite3": "^9.2.2",
-    "nodemailer": "^6.9.7",
-    "dotenv": "^16.3.1",
     "multer": "^1.4.5-lts.1",
-    "csv-parse": "^5.5.2"
+    "resend": "^6.26.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
