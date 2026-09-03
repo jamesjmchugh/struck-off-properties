@@ -60,12 +60,24 @@ nav h1 a {
   text-decoration: none;
 }
 
+nav .nav-links {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
 nav .nav-links a {
   color: #f7f3ea;
   text-decoration: none;
-  margin-left: 1rem;
+  padding: 0 0.85rem;
   font-weight: 400;
   transition: opacity 0.2s;
+}
+
+nav .nav-links a + a::before {
+  content: "|";
+  margin-right: 0.85rem;
+  opacity: 0.45;
 }
 
 nav .nav-links a:hover {

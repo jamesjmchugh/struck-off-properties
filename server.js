@@ -75,9 +75,9 @@ function renderPage(title, content, showNav = true) {
         <nav>
           <h1><a href="/app">Wild Boar Creek CRM</a></h1>
           <div class="nav-links">
-            <a href="/app">Dashboard</a> |
-            <a href="/app/counties">Counties</a> |
-            <a href="/app/inbox">Inbox${badge}</a> |
+            <a href="/app">Dashboard</a>
+            <a href="/app/counties">Counties</a>
+            <a href="/app/inbox">Inbox${badge}</a>
             <a href="/logout">Logout</a>
           </div>
         </nav>
