@@ -1,0 +1,2 @@
+This file contains the replacement /app/counties route for server.js
+It includes: map, column picker, search, date filters, and full Notion columns table

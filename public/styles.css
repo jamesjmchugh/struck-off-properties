@@ -61,6 +61,152 @@ nav .nav-links a:hover {
   opacity: 0.7;
 }
 
+.badge-count {
+  background: #d4a574;
+  color: #002147;
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: 0.25rem;
+}
+
+.inbox-filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.filter-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filter-btn {
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 2px solid #e0ddd5;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #002147;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  border-color: #002147;
+}
+
+.filter-btn.active {
+  background: #002147;
+  color: #f7f3ea;
+  border-color: #002147;
+}
+
+.search-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.search-form input[type="text"] {
+  width: 300px;
+}
+
+.btn-clear {
+  padding: 0.5rem 1rem;
+  background: #e0ddd5;
+  color: #002147;
+  text-decoration: none;
+  border-radius: 6px;
+  border: none;
+  font-weight: 500;
+}
+
+.to-addr {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.muted {
+  color: #999;
+}
+
+.email-detail {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+  margin-bottom: 2rem;
+}
+
+.email-detail hr {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 2px solid #e0ddd5;
+}
+
+.email-body {
+  background: #fafaf8;
+  padding: 1.5rem;
+  border-radius: 8px;
+  max-height: 500px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.inline-form {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.inline-form label {
+  margin-top: 0;
+}
+
+.inline-form select,
+.inline-form input {
+  width: auto;
+  min-width: 200px;
+}
+
+.btn-secondary {
+  background: #666;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #555;
+}
+
+.activity-feed {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+  margin-top: 2rem;
+}
+
+.activity-item {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-item .time {
+  color: #666;
+  font-size: 0.875rem;
+  margin-right: 1rem;
+}
+
 .container {
   max-width: 1200px;
   margin: 2rem auto;

@@ -20,6 +20,18 @@ function initDatabase() {
       tac_email TEXT,
       tac_phone TEXT,
       collection_firm TEXT,
+      attorney_email TEXT,
+      county_judge TEXT,
+      judge_email TEXT,
+      sheriff TEXT,
+      sheriff_email TEXT,
+      primary_outreach_email TEXT,
+      primary_contact_office TEXT,
+      research_status TEXT DEFAULT 'Not started',
+      auction_officer TEXT,
+      resale_type TEXT,
+      struck_off_holder TEXT,
+      inventory_url TEXT,
       outreach_status TEXT DEFAULT 'Not contacted',
       last_emailed TEXT,
       next_followup TEXT,
@@ -29,6 +41,42 @@ function initDatabase() {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Migration: Add new columns if they don't exist
+  const migrations = [
+    'attorney_email',
+    'county_judge',
+    'judge_email',
+    'sheriff',
+    'sheriff_email',
+    'primary_outreach_email',
+    'primary_contact_office',
+    'research_status',
+    'auction_officer',
+    'resale_type',
+    'struck_off_holder',
+    'inventory_url',
+    'last_replied'
+  ];
+
+  migrations.forEach(column => {
+    try {
+      db.exec(`ALTER TABLE counties ADD COLUMN ${column} TEXT`);
+      console.log(`Added column: ${column}`);
+    } catch (err) {
+      // Column already exists, ignore
+      if (!err.message.includes('duplicate column')) {
+        console.error(`Error adding column ${column}:`, err.message);
+      }
+    }
+  });
+
+  // Set default for research_status if column was just added
+  try {
+    db.exec(`UPDATE counties SET research_status = 'Not started' WHERE research_status IS NULL`);
+  } catch (err) {
+    // Ignore
+  }
 
   // Send logs table
   db.exec(`
@@ -40,6 +88,39 @@ function initDatabase() {
       subject TEXT NOT NULL,
       body TEXT NOT NULL,
       FOREIGN KEY (county_id) REFERENCES counties(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Emails/tickets table - stores ALL inbound messages
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS emails (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      from_addr TEXT NOT NULL,
+      to_addr TEXT NOT NULL,
+      subject TEXT,
+      text TEXT,
+      snippet TEXT,
+      message_id TEXT,
+      in_reply_to TEXT,
+      county_id INTEGER,
+      status TEXT DEFAULT 'unassigned',
+      assigned_at TEXT,
+      FOREIGN KEY (county_id) REFERENCES counties(id) ON DELETE SET NULL
+    )
+  `);
+
+  // Activity log table - tracks all CRM actions
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      kind TEXT NOT NULL,
+      county_id INTEGER,
+      email_id INTEGER,
+      detail TEXT,
+      FOREIGN KEY (county_id) REFERENCES counties(id) ON DELETE SET NULL,
+      FOREIGN KEY (email_id) REFERENCES emails(id) ON DELETE SET NULL
     )
   `);
 
@@ -129,7 +210,11 @@ function updateCounty(id, data) {
 
   const allowedFields = [
     'tac_name', 'tac_email', 'tac_phone', 'collection_firm',
-    'outreach_status', 'last_emailed', 'next_followup', 'notes',
+    'attorney_email', 'county_judge', 'judge_email', 'sheriff', 'sheriff_email',
+    'primary_outreach_email', 'primary_contact_office',
+    'research_status', 'auction_officer', 'resale_type', 'struck_off_holder',
+    'inventory_url',
+    'outreach_status', 'last_emailed', 'last_replied', 'next_followup', 'notes',
     'inventory_received_date'
   ];
 
@@ -205,6 +290,97 @@ function getDashboardStats() {
   return { notContacted, dueFollowup, waiting, hasInventory };
 }
 
+// Email/inbox functions
+function addEmail(data) {
+  return db.prepare(`
+    INSERT INTO emails (from_addr, to_addr, subject, text, snippet, message_id, in_reply_to, county_id, status, assigned_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    data.from_addr,
+    data.to_addr,
+    data.subject,
+    data.text,
+    data.snippet,
+    data.message_id,
+    data.in_reply_to,
+    data.county_id || null,
+    data.status || 'unassigned',
+    data.assigned_at || null
+  );
+}
+
+function getEmails(filters = {}) {
+  let query = 'SELECT emails.*, counties.name as county_name FROM emails LEFT JOIN counties ON emails.county_id = counties.id WHERE 1=1';
+  const params = [];
+
+  if (filters.status) {
+    query += ' AND emails.status = ?';
+    params.push(filters.status);
+  }
+
+  if (filters.search) {
+    query += ' AND (emails.from_addr LIKE ? OR emails.subject LIKE ? OR emails.to_addr LIKE ?)';
+    const searchTerm = `%${filters.search}%`;
+    params.push(searchTerm, searchTerm, searchTerm);
+  }
+
+  query += ' ORDER BY emails.received_at DESC LIMIT ?';
+  params.push(filters.limit || 100);
+
+  return db.prepare(query).all(...params);
+}
+
+function getEmailById(id) {
+  return db.prepare(`
+    SELECT emails.*, counties.name as county_name 
+    FROM emails 
+    LEFT JOIN counties ON emails.county_id = counties.id 
+    WHERE emails.id = ?
+  `).get(id);
+}
+
+function updateEmail(id, data) {
+  const fields = [];
+  const values = [];
+
+  ['county_id', 'status', 'assigned_at'].forEach(field => {
+    if (data[field] !== undefined) {
+      fields.push(`${field} = ?`);
+      values.push(data[field]);
+    }
+  });
+
+  values.push(id);
+  const query = `UPDATE emails SET ${fields.join(', ')} WHERE id = ?`;
+  return db.prepare(query).run(...values);
+}
+
+function getUnassignedCount() {
+  return db.prepare('SELECT COUNT(*) as count FROM emails WHERE status = \'unassigned\'').get().count;
+}
+
+// Activity log functions
+function addActivity(kind, county_id = null, email_id = null, detail = null) {
+  return db.prepare(`
+    INSERT INTO activity_log (kind, county_id, email_id, detail)
+    VALUES (?, ?, ?, ?)
+  `).run(kind, county_id, email_id, detail);
+}
+
+function getRecentActivity(limit = 50) {
+  return db.prepare(`
+    SELECT 
+      activity_log.*,
+      counties.name as county_name,
+      emails.from_addr as email_from
+    FROM activity_log
+    LEFT JOIN counties ON activity_log.county_id = counties.id
+    LEFT JOIN emails ON activity_log.email_id = emails.id
+    ORDER BY activity_log.at DESC
+    LIMIT ?
+  `).all(limit);
+}
+
 module.exports = {
   db,
   initDatabase,
@@ -218,5 +394,12 @@ module.exports = {
   getTodaySendCount,
   getEmailTemplate,
   updateEmailTemplate,
-  getDashboardStats
+  getDashboardStats,
+  addEmail,
+  getEmails,
+  getEmailById,
+  updateEmail,
+  getUnassignedCount,
+  addActivity,
+  getRecentActivity
 };

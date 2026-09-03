@@ -194,6 +194,16 @@ This app is designed to sit behind `https://wildboarcreek.com/login/` on a NixiH
 - **CRM app:** Nginx proxies `/app/*` to Node app
 - **Inbound webhook:** Nginx proxies `/inbound` to Node app
 
+### Cloudflare Flexible SSL
+
+If using Cloudflare with Flexible SSL (HTTPS to Cloudflare, HTTP to origin):
+
+1. **Express trust proxy** - `app.set('trust proxy', 1)` (already configured in server.js)
+2. **Nginx X-Forwarded-Proto** - Must be set to `https` (not `$scheme`) in nginx config
+3. **Session cookies** - Uses `secure: true` and `sameSite: 'lax'` (already configured)
+
+Without trust proxy + correct X-Forwarded-Proto, login will appear broken (302 redirect but no session cookie).
+
 See `deployment/DEPLOYMENT.md` for complete production setup instructions including:
 - Systemd service configuration
 - Nginx reverse proxy setup

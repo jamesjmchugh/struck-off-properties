@@ -52,6 +52,9 @@ const upload = multer({ dest: 'uploads/' });
 
 // Helper: render HTML page with Wild Boar Creek styling
 function renderPage(title, content, showNav = true) {
+  const unassignedCount = showNav ? db.getUnassignedCount() : 0;
+  const badge = unassignedCount > 0 ? ` <span class="badge-count">${unassignedCount}</span>` : '';
+  
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -59,6 +62,9 @@ function renderPage(title, content, showNav = true) {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>${title} - Wild Boar Creek CRM</title>
+      <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+      <link rel="icon" type="image/png" href="/favicon.png">
+      <link rel="apple-touch-icon" href="/apple-touch-icon.png">
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -71,6 +77,7 @@ function renderPage(title, content, showNav = true) {
           <div class="nav-links">
             <a href="/app">Dashboard</a> |
             <a href="/app/counties">Counties</a> |
+            <a href="/app/inbox">Inbox${badge}</a> |
             <a href="/logout">Logout</a>
           </div>
         </nav>
@@ -142,43 +149,117 @@ app.post('/inbound', (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { from, to, subject, text, date } = req.body;
+  const { from, to, subject, messageId, inReplyTo, references, date, raw } = req.body;
   
   if (!from) {
     return res.status(400).json({ error: 'Missing from field' });
   }
 
-  // Extract email address from "Name <email@domain.com>" format
-  const emailMatch = from.match(/<(.+?)>/) || [null, from];
-  const senderEmail = emailMatch[1].toLowerCase().trim();
+  // Extract email addresses
+  const extractEmail = (str) => {
+    const match = str.match(/<(.+?)>/) || [null, str];
+    return match[1].toLowerCase().trim();
+  };
 
-  console.log(`Inbound email from: ${senderEmail}`);
+  const fromAddr = extractEmail(from);
+  const toAddr = to ? extractEmail(to) : 'james@wildboarcreek.com';
 
-  // Find county by TAC email
-  const county = db.getCountyByEmail(senderEmail);
-  
-  if (county) {
-    console.log(`Matched to ${county.name} County`);
+  console.log(`Inbound email from: ${fromAddr} to: ${toAddr}`);
+
+  // Parse text from raw (simple version - could be enhanced)
+  let text = '';
+  let snippet = '';
+  if (raw) {
+    // Very basic text extraction from raw email
+    text = raw.substring(0, 10000); // Limit size
+    snippet = (subject || text.substring(0, 200)).substring(0, 200);
+  } else {
+    snippet = subject ? subject.substring(0, 200) : '';
+  }
+
+  // Smart routing: Try to match to a county
+  let matchedCounty = null;
+  let matchReason = 'unmatched';
+
+  // 1. Try matching by email address (any county email field)
+  const emailColumns = ['tac_email', 'primary_outreach_email', 'sheriff_email', 'judge_email', 'attorney_email'];
+  for (const column of emailColumns) {
+    const county = db.db.prepare(`SELECT * FROM counties WHERE LOWER(${column}) = ?`).get(fromAddr);
+    if (county) {
+      matchedCounty = county;
+      matchReason = `matched by ${column}`;
+      break;
+    }
+  }
+
+  // 2. If no email match, try matching county name in subject or body
+  if (!matchedCounty && (subject || text)) {
+    const searchText = `${subject} ${text}`.toLowerCase();
+    const allCounties = db.getCounties();
     
-    // Update county status to Replied and clear follow-up
-    db.updateCounty(county.id, {
+    for (const county of allCounties) {
+      const countyName = county.name.toLowerCase();
+      if (searchText.includes(countyName + ' county') || searchText.includes(countyName)) {
+        matchedCounty = county;
+        matchReason = 'matched by name in subject/body';
+        break;
+      }
+    }
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+
+  // Store email in database
+  const emailData = {
+    from_addr: fromAddr,
+    to_addr: toAddr,
+    subject: subject || '',
+    text: text,
+    snippet: snippet,
+    message_id: messageId,
+    in_reply_to: inReplyTo,
+    county_id: matchedCounty ? matchedCounty.id : null,
+    status: matchedCounty ? 'assigned' : 'unassigned',
+    assigned_at: matchedCounty ? today : null
+  };
+
+  const result = db.addEmail(emailData);
+  const emailId = result.lastInsertRowid;
+
+  console.log(`Stored email ID ${emailId}, ${matchReason}`);
+
+  // If matched to county, update county status and log activity
+  if (matchedCounty) {
+    console.log(`Matched to ${matchedCounty.name} County`);
+    
+    // Update county: mark as Replied, set last_replied, clear follow-up
+    db.updateCounty(matchedCounty.id, {
       outreach_status: 'Replied',
+      last_replied: today,
       next_followup: null
     });
 
-    // Log the inbound email (you could add an inbound_logs table if needed)
-    console.log(`County ${county.name} marked as Replied`);
+    // Log activity: replied
+    db.addActivity('replied', matchedCounty.id, emailId, `Reply from ${fromAddr}`);
+
+    console.log(`County ${matchedCounty.name} marked as Replied, last_replied set to ${today}`);
     
     return res.json({ 
       success: true, 
-      county: county.name,
-      message: 'County marked as Replied'
+      county: matchedCounty.name,
+      email_id: emailId,
+      message: 'Email stored and assigned to county'
     });
   } else {
-    console.log(`No county found for email: ${senderEmail}`);
+    // Log activity: inbound unmatched
+    db.addActivity('inbound', null, emailId, `Unmatched email from ${fromAddr} to ${toAddr}`);
+    
+    console.log(`No county match, stored as unassigned ticket`);
+    
     return res.json({ 
-      success: false, 
-      message: 'No matching county found' 
+      success: true,
+      email_id: emailId,
+      message: 'Email stored as unassigned ticket' 
     });
   }
 });
@@ -195,6 +276,42 @@ app.get('/', (req, res) => {
 // Dashboard
 app.get('/app', requireAuth, (req, res) => {
   const stats = db.getDashboardStats();
+  const recentActivity = db.getRecentActivity(50);
+  
+  const activityHtml = recentActivity.map(act => {
+    let text = '';
+    const time = new Date(act.at).toLocaleString();
+    
+    switch(act.kind) {
+      case 'emailed':
+        text = act.county_name ? 
+          `<a href="/app/county/${act.county_id}">${act.county_name}</a> emailed` :
+          'Email sent';
+        break;
+      case 'replied':
+        text = act.county_name ?
+          `<a href="/app/county/${act.county_id}">${act.county_name}</a> replied` :
+          'Reply received';
+        break;
+      case 'assigned':
+        text = act.county_name ?
+          `Email assigned to <a href="/app/county/${act.county_id}">${act.county_name}</a>` :
+          'Email assigned';
+        break;
+      case 'inbound':
+        text = `<a href="/app/inbox/${act.email_id}">Unassigned mail</a> from ${act.detail || 'unknown'}`;
+        break;
+      case 'status_changed':
+        text = act.county_name ?
+          `<a href="/app/county/${act.county_id}">${act.county_name}</a> status changed` :
+          'Status changed';
+        break;
+      default:
+        text = act.kind;
+    }
+    
+    return `<div class="activity-item"><span class="time">${time}</span> ${text}</div>`;
+  }).join('');
   
   const content = `
     <div class="container">
@@ -228,8 +345,14 @@ app.get('/app', requireAuth, (req, res) => {
       
       <div class="actions">
         <a href="/app/counties" class="btn">View All Counties</a>
+        <a href="/app/inbox" class="btn">View Inbox</a>
         <a href="/app/import" class="btn">Import CSV</a>
         <a href="/app/template" class="btn">Edit Email Template</a>
+      </div>
+      
+      <h3>Recent Activity</h3>
+      <div class="activity-feed">
+        ${activityHtml || '<p>No recent activity</p>'}
       </div>
     </div>
   `;
@@ -442,6 +565,10 @@ app.post('/app/county/:id/send', requireAuth, async (req, res) => {
 
   try {
     const result = await emailService.sendEmail(county);
+    
+    // Log activity: emailed
+    db.addActivity('emailed', county.id, null, `Sent to ${county.tac_email}`);
+    
     res.redirect(`/app/county/${req.params.id}?sent=1`);
   } catch (error) {
     console.error('Send error:', error);
@@ -542,6 +669,177 @@ app.post('/app/import', requireAuth, upload.single('csvfile'), async (req, res) 
     }
     res.status(500).send(`Import failed: ${error.message}`);
   }
+});
+
+// Inbox list
+app.get('/app/inbox', requireAuth, (req, res) => {
+  const { status, search } = req.query;
+  
+  const filters = {};
+  if (status) filters.status = status;
+  if (search) filters.search = search;
+  
+  const emails = db.getEmails(filters);
+  const totalCount = db.db.prepare('SELECT COUNT(*) as count FROM emails').get().count;
+  
+  const rows = emails.map(email => {
+    const statusClass = email.status.replace(' ', '-');
+    const countyLink = email.county_id ? 
+      `<a href="/app/county/${email.county_id}">${email.county_name}</a>` :
+      '<span class="muted">Unassigned</span>';
+    
+    return `
+      <tr>
+        <td><a href="/app/inbox/${email.id}">${new Date(email.received_at).toLocaleString()}</a></td>
+        <td><strong>${email.from_addr}</strong></td>
+        <td><span class="to-addr">${email.to_addr}</span></td>
+        <td>${email.subject || '(no subject)'}</td>
+        <td>${countyLink}</td>
+        <td><span class="badge badge-${statusClass}">${email.status}</span></td>
+      </tr>
+    `;
+  }).join('');
+
+  const content = `
+    <div class="container">
+      <h2>Inbox (${emails.length}${emails.length < totalCount ? ` of ${totalCount}` : ''})</h2>
+      
+      <div class="inbox-filters">
+        <div class="filter-group">
+          <a href="/app/inbox" class="filter-btn ${!status ? 'active' : ''}">All</a>
+          <a href="/app/inbox?status=unassigned" class="filter-btn ${status === 'unassigned' ? 'active' : ''}">Unassigned</a>
+          <a href="/app/inbox?status=assigned" class="filter-btn ${status === 'assigned' ? 'active' : ''}">Assigned</a>
+          <a href="/app/inbox?status=closed" class="filter-btn ${status === 'closed' ? 'active' : ''}">Closed</a>
+        </div>
+        
+        <form method="GET" action="/app/inbox" class="search-form">
+          ${status ? `<input type="hidden" name="status" value="${status}">` : ''}
+          <input type="text" name="search" placeholder="Search from, to, subject..." value="${search || ''}" />
+          <button type="submit">Search</button>
+          ${search ? '<a href="/app/inbox" class="btn-clear">Clear</a>' : ''}
+        </form>
+      </div>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>Received</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Subject</th>
+            <th>County</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows || '<tr><td colspan="6">No emails</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `;
+  
+  res.send(renderPage('Inbox', content));
+});
+
+// Inbox detail
+app.get('/app/inbox/:id', requireAuth, (req, res) => {
+  const email = db.getEmailById(req.params.id);
+  if (!email) {
+    return res.status(404).send('Email not found');
+  }
+
+  const allCounties = db.getCounties();
+  const countyOptions = allCounties.map(c => 
+    `<option value="${c.id}" ${email.county_id === c.id ? 'selected' : ''}>${c.name}</option>`
+  ).join('');
+
+  const content = `
+    <div class="container">
+      <h2>Email Detail</h2>
+      
+      <div class="email-detail">
+        <p><strong>From:</strong> ${email.from_addr}</p>
+        <p><strong>To:</strong> ${email.to_addr}</p>
+        <p><strong>Received:</strong> ${new Date(email.received_at).toLocaleString()}</p>
+        <p><strong>Subject:</strong> ${email.subject || '(no subject)'}</p>
+        ${email.message_id ? `<p><strong>Message ID:</strong> <code>${email.message_id}</code></p>` : ''}
+        ${email.in_reply_to ? `<p><strong>In Reply To:</strong> <code>${email.in_reply_to}</code></p>` : ''}
+        
+        <hr>
+        
+        <h3>Message</h3>
+        <pre class="email-body">${email.text || email.snippet || '(no content)'}</pre>
+      </div>
+      
+      <h3>Actions</h3>
+      <form method="POST" action="/app/inbox/${email.id}/assign" class="inline-form">
+        <label>Assign to County</label>
+        <select name="county_id" required>
+          <option value="">-- Select County --</option>
+          ${countyOptions}
+        </select>
+        <button type="submit">Assign</button>
+      </form>
+      
+      ${email.county_id ? `
+        <p class="info">Currently assigned to <a href="/app/county/${email.county_id}">${email.county_name}</a></p>
+      ` : ''}
+      
+      ${email.status !== 'closed' ? `
+        <form method="POST" action="/app/inbox/${email.id}/close" class="inline-form">
+          <button type="submit" class="btn-secondary">Close Ticket</button>
+        </form>
+      ` : '<p class="info">This ticket is closed</p>'}
+      
+      <a href="/app/inbox" class="btn">← Back to Inbox</a>
+    </div>
+  `;
+  
+  res.send(renderPage('Email Detail', content));
+});
+
+// Assign email to county
+app.post('/app/inbox/:id/assign', requireAuth, (req, res) => {
+  const { county_id } = req.body;
+  const email = db.getEmailById(req.params.id);
+  
+  if (!email) {
+    return res.status(404).send('Email not found');
+  }
+  
+  const county = db.getCountyById(county_id);
+  if (!county) {
+    return res.status(400).send('Invalid county');
+  }
+  
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Update email
+  db.updateEmail(email.id, {
+    county_id: county_id,
+    status: 'assigned',
+    assigned_at: today
+  });
+  
+  // Update county if this is a reply
+  if (email.from_addr) {
+    db.updateCounty(county_id, {
+      outreach_status: 'Replied',
+      last_replied: today,
+      next_followup: null
+    });
+  }
+  
+  // Log activity
+  db.addActivity('assigned', county_id, email.id, `Manually assigned email from ${email.from_addr}`);
+  
+  res.redirect(`/app/inbox/${email.id}`);
+});
+
+// Close email ticket
+app.post('/app/inbox/:id/close', requireAuth, (req, res) => {
+  db.updateEmail(req.params.id, { status: 'closed' });
+  res.redirect(`/app/inbox/${req.params.id}`);
 });
 
 // Email template editor
