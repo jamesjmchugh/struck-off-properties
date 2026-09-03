@@ -339,6 +339,14 @@ function getEmailById(id) {
   `).get(id);
 }
 
+function getEmailsByCounty(countyId) {
+  return db.prepare(`
+    SELECT * FROM emails 
+    WHERE county_id = ? 
+    ORDER BY received_at DESC
+  `).all(countyId);
+}
+
 function updateEmail(id, data) {
   const fields = [];
   const values = [];
@@ -398,6 +406,7 @@ module.exports = {
   addEmail,
   getEmails,
   getEmailById,
+  getEmailsByCounty,
   updateEmail,
   getUnassignedCount,
   addActivity,

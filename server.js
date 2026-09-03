@@ -702,9 +702,48 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
   }
 
   const logs = db.getSendLogs(county.id);
+  const emails = db.getEmailsByCounty(county.id);
   const todaySends = db.getTodaySendCount();
   const dailyCap = parseInt(process.env.SEND_DAILY_CAP || '5');
   const canSend = todaySends < dailyCap && county.tac_email;
+
+  // Helper: extract readable plain text from email body
+  function extractReadableBody(text, snippet) {
+    if (!text) return snippet || '(No content)';
+    
+    // If text looks like raw MIME, try to extract text/plain part
+    if (text.includes('Content-Type:') || text.includes('MIME-Version:')) {
+      // Find text/plain boundary
+      const plainMatch = text.match(/Content-Type: text\/plain[^\n]*\n\n([\s\S]*?)(?=\n--|\n\nContent-Type:|$)/i);
+      if (plainMatch) {
+        text = plainMatch[1];
+      } else {
+        // Strip headers and take body
+        const bodyMatch = text.match(/\n\n([\s\S]+)$/);
+        if (bodyMatch) {
+          text = bodyMatch[1];
+        }
+      }
+    }
+    
+    // Remove quoted-printable soft line breaks (=\n)
+    text = text.replace(/=\r?\n/g, '');
+    
+    // Remove MIME headers if still present
+    text = text.split('\n').filter(line => 
+      !line.match(/^(Received:|DKIM-Signature:|Return-Path:|X-|Date:|From:|To:|Subject:|Message-ID:|In-Reply-To:|References:|Content-Type:|Content-Transfer-Encoding:|MIME-Version:)/i)
+    ).join('\n');
+    
+    // Clean up excessive whitespace
+    text = text.trim().replace(/\n{3,}/g, '\n\n');
+    
+    // Truncate if too long
+    if (text.length > 2000) {
+      text = text.substring(0, 2000) + '\n\n[...truncated]';
+    }
+    
+    return text || snippet || '(No readable content)';
+  }
 
   const logsHtml = logs.length > 0 ? logs.map(log => `
     <div class="log-entry">
@@ -713,6 +752,26 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
       Subject: ${log.subject}
     </div>
   `).join('') : '<p>No emails sent yet</p>';
+
+  const emailsHtml = emails.length > 0 ? emails.map(email => {
+    const readableBody = extractReadableBody(email.text, email.snippet);
+    return `
+      <div class="email-reply">
+        <div class="email-header">
+          <strong>${new Date(email.received_at).toLocaleString()}</strong>
+          ${email.id ? ` · <a href="/app/inbox/${email.id}">View in Inbox</a>` : ''}
+        </div>
+        <p><strong>From:</strong> ${email.from_addr}</p>
+        <p><strong>To:</strong> ${email.to_addr}</p>
+        <p><strong>Subject:</strong> ${email.subject || '(no subject)'}</p>
+        <div class="email-body">
+          <pre>${readableBody}</pre>
+        </div>
+      </div>
+    `;
+  }).join('') : '<p>No replies received yet</p>';
+
+  const tacSummary = `TAC Contact Information — ${county.tac_name || 'No name'} · ${county.tac_email || 'No email'}`;
 
   const content = `
     <div class="container">
@@ -723,42 +782,45 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
         <p><strong>FIPS:</strong> ${county.fips}</p>
         <p><strong>Status:</strong> <span class="badge badge-${county.outreach_status.toLowerCase().replace(' ', '-')}">${county.outreach_status}</span></p>
         ${county.last_emailed ? `<p><strong>Last Emailed:</strong> ${county.last_emailed}</p>` : ''}
+        ${county.last_replied ? `<p><strong>Last Replied:</strong> ${county.last_replied}</p>` : ''}
         ${county.next_followup ? `<p><strong>Next Follow-up:</strong> ${county.next_followup}</p>` : ''}
         ${county.inventory_received_date ? `<p><strong>Inventory Received:</strong> ${county.inventory_received_date}</p>` : ''}
       </div>
 
-      <h3>TAC Contact Information</h3>
-      <form method="POST" action="/app/county/${county.id}/update">
-        <label>TAC Name</label>
-        <input type="text" name="tac_name" value="${county.tac_name || ''}" placeholder="Tax Assessor-Collector Name">
-        
-        <label>TAC Email</label>
-        <input type="email" name="tac_email" value="${county.tac_email || ''}" placeholder="tac@example.com">
-        
-        <label>TAC Phone</label>
-        <input type="tel" name="tac_phone" value="${county.tac_phone || ''}" placeholder="(555) 123-4567">
-        
-        <label>Collection Firm</label>
-        <input type="text" name="collection_firm" value="${county.collection_firm || ''}" placeholder="Collection firm name">
-        
-        <label>Outreach Status</label>
-        <select name="outreach_status">
-          <option value="Not contacted" ${county.outreach_status === 'Not contacted' ? 'selected' : ''}>Not contacted</option>
-          <option value="Emailed" ${county.outreach_status === 'Emailed' ? 'selected' : ''}>Emailed</option>
-          <option value="Replied" ${county.outreach_status === 'Replied' ? 'selected' : ''}>Replied</option>
-          <option value="List received" ${county.outreach_status === 'List received' ? 'selected' : ''}>List received</option>
-          <option value="Offer in play" ${county.outreach_status === 'Offer in play' ? 'selected' : ''}>Offer in play</option>
-          <option value="Closed" ${county.outreach_status === 'Closed' ? 'selected' : ''}>Closed</option>
-        </select>
-        
-        <label>Inventory Received Date</label>
-        <input type="date" name="inventory_received_date" value="${county.inventory_received_date || ''}">
-        
-        <label>Notes</label>
-        <textarea name="notes" rows="4" placeholder="Internal notes...">${county.notes || ''}</textarea>
-        
-        <button type="submit">Update County</button>
-      </form>
+      <details class="tac-contact-section">
+        <summary>${tacSummary}</summary>
+        <form method="POST" action="/app/county/${county.id}/update">
+          <label>TAC Name</label>
+          <input type="text" name="tac_name" value="${county.tac_name || ''}" placeholder="Tax Assessor-Collector Name">
+          
+          <label>TAC Email</label>
+          <input type="email" name="tac_email" value="${county.tac_email || ''}" placeholder="tac@example.com">
+          
+          <label>TAC Phone</label>
+          <input type="tel" name="tac_phone" value="${county.tac_phone || ''}" placeholder="(555) 123-4567">
+          
+          <label>Collection Firm</label>
+          <input type="text" name="collection_firm" value="${county.collection_firm || ''}" placeholder="Collection firm name">
+          
+          <label>Outreach Status</label>
+          <select name="outreach_status">
+            <option value="Not contacted" ${county.outreach_status === 'Not contacted' ? 'selected' : ''}>Not contacted</option>
+            <option value="Emailed" ${county.outreach_status === 'Emailed' ? 'selected' : ''}>Emailed</option>
+            <option value="Replied" ${county.outreach_status === 'Replied' ? 'selected' : ''}>Replied</option>
+            <option value="List received" ${county.outreach_status === 'List received' ? 'selected' : ''}>List received</option>
+            <option value="Offer in play" ${county.outreach_status === 'Offer in play' ? 'selected' : ''}>Offer in play</option>
+            <option value="Closed" ${county.outreach_status === 'Closed' ? 'selected' : ''}>Closed</option>
+          </select>
+          
+          <label>Inventory Received Date</label>
+          <input type="date" name="inventory_received_date" value="${county.inventory_received_date || ''}">
+          
+          <label>Notes</label>
+          <textarea name="notes" rows="4" placeholder="Internal notes...">${county.notes || ''}</textarea>
+          
+          <button type="submit">Update County</button>
+        </form>
+      </details>
 
       ${canSend ? `
         <h3>Send Email</h3>
@@ -776,7 +838,12 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
         </div>
       `}
 
-      <h3>Send History</h3>
+      <h3>Replies / Inbox (${emails.length})</h3>
+      <div class="replies-section">
+        ${emailsHtml}
+      </div>
+
+      <h3>Send History (${logs.length})</h3>
       <div class="logs">
         ${logsHtml}
       </div>

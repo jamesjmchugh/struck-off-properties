@@ -823,3 +823,88 @@ footer .fine {
   opacity: 0.65;
   margin-top: 1rem;
 }
+
+/* County detail: collapsible TAC section */
+.tac-contact-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #002147;
+  margin: 2rem 0;
+}
+
+.tac-contact-section summary {
+  font-weight: 600;
+  color: #002147;
+  cursor: pointer;
+  font-size: 1.1rem;
+  margin: -0.5rem;
+  padding: 0.5rem;
+  list-style-position: outside;
+}
+
+.tac-contact-section summary:hover {
+  opacity: 0.7;
+}
+
+.tac-contact-section[open] summary {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e0ddd5;
+}
+
+.tac-contact-section form {
+  margin-top: 0;
+}
+
+/* Replies / Inbox section */
+.replies-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #002147;
+  margin: 1.5rem 0;
+}
+
+.email-reply {
+  background: #fafaf8;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border-left: 3px solid #4a7c9e;
+  margin-bottom: 1.5rem;
+}
+
+.email-reply:last-child {
+  margin-bottom: 0;
+}
+
+.email-header {
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+  color: #666;
+}
+
+.email-header a {
+  color: #002147;
+  font-weight: 500;
+}
+
+.email-reply p {
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.email-body {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0ddd5;
+}
+
+.email-body pre {
+  white-space: pre-wrap;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+  color: #002147;
+}
