@@ -67,13 +67,13 @@ function renderPage(title, content, showNav = true) {
       <link rel="apple-touch-icon" href="/apple-touch-icon.png">
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-      <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
       <link rel="stylesheet" href="/styles.css">
     </head>
     <body>
       ${showNav ? `
         <nav>
-          <h1>Wild Boar Creek CRM</h1>
+          <h1><a href="/app">Wild Boar Creek CRM</a></h1>
           <div class="nav-links">
             <a href="/app">Dashboard</a> |
             <a href="/app/counties">Counties</a> |
@@ -82,7 +82,15 @@ function renderPage(title, content, showNav = true) {
           </div>
         </nav>
       ` : ''}
-      ${content}
+      <main>
+        ${content}
+      </main>
+      <footer>
+        <p class="name">Wild Boar Creek</p>
+        <p>16518 House Hahl Rd #106<br />Cypress, TX 77433</p>
+        <p><a href="mailto:james@wildboarcreek.com">james@wildboarcreek.com</a></p>
+        <p class="fine">Established for the long haul</p>
+      </footer>
     </body>
     </html>
   `;

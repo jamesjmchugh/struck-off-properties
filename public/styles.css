@@ -25,6 +25,12 @@ body {
       rgba(0, 33, 71, 0.02) 3px
     );
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -43,10 +49,15 @@ nav {
 }
 
 nav h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.375rem;
+  font-weight: 500;
   font-family: 'Fraunces', Georgia, serif;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.04em;
+}
+
+nav h1 a {
+  color: #f7f3ea;
+  text-decoration: none;
 }
 
 nav .nav-links a {
@@ -765,4 +776,50 @@ button[type="submit"]:hover {
 #counties-table th.sticky-col {
   background: #002147;
   z-index: 15;
+}
+
+/* Footer */
+footer {
+  background: #002147;
+  color: #f7f3ea;
+  text-align: center;
+  padding: 2rem 1.25rem 2.25rem;
+  margin-top: 4rem;
+}
+
+footer p {
+  margin-bottom: 0.75rem;
+}
+
+footer p:last-child {
+  margin-bottom: 0;
+}
+
+footer .name {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+footer a {
+  color: #f7f3ea;
+  text-decoration: underline;
+  text-decoration-color: rgba(247, 243, 234, 0.35);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.2s;
+}
+
+footer a:hover {
+  text-decoration-color: rgba(247, 243, 234, 1);
+}
+
+footer .fine {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin-top: 1rem;
 }
