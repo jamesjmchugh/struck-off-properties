@@ -14,6 +14,10 @@ const STAFF_EMAIL = process.env.STAFF_EMAIL || 'james@wildboarcreek.com';
 const STAFF_PASSWORD = process.env.STAFF_PASSWORD || process.env.APP_PASSWORD || 'changeme123';
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'change-this-secret';
 
+// Trust proxy (required for Cloudflare Flexible SSL)
+// This allows Express to trust X-Forwarded-Proto header
+app.set('trust proxy', 1);
+
 // Initialize database
 db.initDatabase();
 
@@ -30,7 +34,8 @@ app.use(session({
   cookie: { 
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production'
+    secure: true,
+    sameSite: 'lax'
   }
 }));
 

@@ -95,7 +95,7 @@ function getCounties(filters = {}) {
   }
 
   if (filters.dueFollowup) {
-    query += ' AND next_followup IS NOT NULL AND next_followup <= date("now") AND outreach_status != "Closed"';
+    query += ' AND next_followup IS NOT NULL AND next_followup <= date(\'now\') AND outreach_status != \'Closed\'';
   }
 
   if (filters.hasInventory) {
@@ -187,15 +187,15 @@ function updateEmailTemplate(subject, body) {
 // Get dashboard stats
 function getDashboardStats() {
   const notContacted = db.prepare(
-    'SELECT COUNT(*) as count FROM counties WHERE outreach_status = "Not contacted"'
+    'SELECT COUNT(*) as count FROM counties WHERE outreach_status = \'Not contacted\''
   ).get().count;
 
   const dueFollowup = db.prepare(
-    'SELECT COUNT(*) as count FROM counties WHERE next_followup <= date("now") AND outreach_status != "Closed"'
+    'SELECT COUNT(*) as count FROM counties WHERE next_followup <= date(\'now\') AND outreach_status != \'Closed\''
   ).get().count;
 
   const waiting = db.prepare(
-    'SELECT COUNT(*) as count FROM counties WHERE outreach_status = "Emailed"'
+    'SELECT COUNT(*) as count FROM counties WHERE outreach_status = \'Emailed\''
   ).get().count;
 
   const hasInventory = db.prepare(

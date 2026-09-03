@@ -4,9 +4,18 @@
 
 1. Node.js 16+ installed on the VPS
 2. Nginx installed and running
-3. SSL certificate for wildboarcreek.com (Let's Encrypt recommended)
+3. SSL certificate for wildboarcreek.com (or Cloudflare Flexible SSL)
 4. Non-root user (e.g., `nodejs`) to run the application
 5. Resend account with API key
+
+## Important: Cloudflare Flexible SSL
+
+If using Cloudflare with Flexible SSL (HTTPS to Cloudflare, HTTP to origin):
+
+1. **Express trust proxy** - Required so Express trusts the X-Forwarded-Proto header
+2. **Nginx X-Forwarded-Proto** - Must explicitly set to `https` (not `$scheme`) because TLS terminates at Cloudflare
+
+Without these, session cookies won't work (cookie.secure requires HTTPS).
 
 ## Installation Steps
 
@@ -93,6 +102,8 @@ sudo systemctl status wildboarcreek-crm
 
 **Important:** The public Wild Boar Creek landing page should remain at `/var/www/wildboarcreek.com/public/index.html`. The CRM is only accessible via `/login` and `/app`.
 
+**For Cloudflare Flexible SSL:** Nginx must set `X-Forwarded-Proto https` (not `$scheme`) because TLS terminates at Cloudflare. The origin receives HTTP but Express needs to see HTTPS for secure cookies.
+
 ```bash
 # Copy nginx config
 sudo cp deployment/nginx-wildboarcreek.conf /etc/nginx/sites-available/wildboarcreek.com
@@ -100,6 +111,7 @@ sudo cp deployment/nginx-wildboarcreek.conf /etc/nginx/sites-available/wildboarc
 # Edit paths in the config
 sudo nano /etc/nginx/sites-available/wildboarcreek.com
 # Update SSL certificate paths and root directory
+# Verify X-Forwarded-Proto is set to https (not $scheme)
 
 # Enable site
 sudo ln -s /etc/nginx/sites-available/wildboarcreek.com /etc/nginx/sites-enabled/
@@ -190,6 +202,18 @@ sudo journalctl -u wildboarcreek-crm -n 50
 - Check nginx config: `sudo nginx -t`
 - Verify service is running: `curl http://127.0.0.1:3000/login`
 - Check nginx logs: `sudo tail -f /var/log/nginx/wildboarcreek.error.log`
+
+**Login succeeds but redirects to /login (no session cookie):**
+- **Cloudflare Flexible SSL issue** - Verify these fixes:
+  1. Express has `app.set('trust proxy', 1)` in server.js
+  2. Nginx sets `proxy_set_header X-Forwarded-Proto https;` (not `$scheme`)
+  3. Session cookie has `secure: true` and `sameSite: 'lax'`
+- Without trust proxy, Express doesn't trust X-Forwarded-Proto and won't send secure cookies
+- Using `$scheme` sends "http" (origin protocol) instead of "https" (user-facing protocol)
+
+**Dashboard crashes with "no such column" error:**
+- SQLite syntax: Use single quotes for strings (`'Not contacted'`), not double quotes
+- Double quotes are identifiers in SQLite
 
 **Inbound webhook not working:**
 - Verify WEBHOOK_SECRET matches Resend configuration
