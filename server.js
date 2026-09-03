@@ -457,36 +457,45 @@ app.get('/app/counties', requireAuth, (req, res) => {
     // Parse data
     const countiesData = JSON.parse(document.getElementById('counties-data').textContent);
     
+    // HTML escape helper
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
     // Column definitions
     const columns = [
       {id: 'name', label: 'County', defaultVisible: true, sticky: true},
       {id: 'seat', label: 'Seat', defaultVisible: true},
-      {id: 'fips', label: 'FIPS', defaultVisible: false},
-      {id: 'outreach_status', label: 'Status', defaultVisible: true},
-      {id: 'research_status', label: 'Research', defaultVisible: false},
-      {id: 'tac_name', label: 'TAC', defaultVisible: true},
+      {id: 'fips', label: 'FIPS', defaultVisible: true},
+      {id: 'outreach_status', label: 'Outreach Status', defaultVisible: true},
+      {id: 'research_status', label: 'Research Status', defaultVisible: false},
+      {id: 'tac_name', label: 'Tax Assessor-Collector', defaultVisible: false},
       {id: 'tac_email', label: 'TAC Email', defaultVisible: true},
       {id: 'tac_phone', label: 'TAC Phone', defaultVisible: false},
-      {id: 'county_judge', label: 'Judge', defaultVisible: true},
+      {id: 'county_judge', label: 'County Judge', defaultVisible: false},
       {id: 'judge_email', label: 'Judge Email', defaultVisible: false},
-      {id: 'sheriff', label: 'Sheriff', defaultVisible: true},
+      {id: 'sheriff', label: 'Sheriff', defaultVisible: false},
       {id: 'sheriff_email', label: 'Sheriff Email', defaultVisible: false},
       {id: 'attorney_email', label: 'Attorney Email', defaultVisible: false},
-      {id: 'collection_firm', label: 'Collection Firm', defaultVisible: false},
-      {id: 'primary_outreach_email', label: 'Primary Email', defaultVisible: false},
-      {id: 'primary_contact_office', label: 'Primary Office', defaultVisible: false},
+      {id: 'collection_firm', label: 'Delinquent Tax Attorney', defaultVisible: false},
+      {id: 'primary_outreach_email', label: 'Primary Outreach Email', defaultVisible: false},
+      {id: 'primary_contact_office', label: 'Primary Contact Office', defaultVisible: false},
       {id: 'auction_officer', label: 'Auction Officer', defaultVisible: false},
       {id: 'resale_type', label: 'Resale Type', defaultVisible: false},
       {id: 'struck_off_holder', label: 'Struck-off Holder', defaultVisible: false},
-      {id: 'inventory_url', label: 'Inventory URL', defaultVisible: false},
+      {id: 'inventory_url', label: 'Inventory / Sale URL', defaultVisible: false},
+      {id: 'notes', label: 'Notes', defaultVisible: false},
       {id: 'last_emailed', label: 'Last Emailed', defaultVisible: true},
-      {id: 'last_replied', label: 'Last Replied', defaultVisible: false},
+      {id: 'last_replied', label: 'Last Replied', defaultVisible: true},
       {id: 'next_followup', label: 'Next Follow-up', defaultVisible: true},
-      {id: 'inventory_received_date', label: 'Inventory Date', defaultVisible: false}
+      {id: 'inventory_received_date', label: 'Inventory Received', defaultVisible: false}
     ];
     
     // Load column visibility from localStorage
-    const savedColumns = localStorage.getItem('counties-columns');
+    const savedColumns = localStorage.getItem('wbc-counties-cols');
     const visibleColumns = savedColumns ? JSON.parse(savedColumns) : 
       columns.filter(c => c.defaultVisible).map(c => c.id);
     
@@ -578,11 +587,13 @@ app.get('/app/counties', requireAuth, (req, res) => {
           .map(c => {
             let value = county[c.id] || '';
             if (c.id === 'name') {
-              value = \`<a href="/app/county/\${county.id}">\${value}</a>\`;
+              value = \`<a href="/app/county/\${county.id}">\${escapeHtml(value)}</a>\`;
             } else if (c.id === 'outreach_status') {
-              value = \`<span class="badge badge-\${value.toLowerCase().replace(' ', '-')}">\${value}</span>\`;
+              value = \`<span class="badge badge-\${escapeHtml(value).toLowerCase().replace(' ', '-')}">\${escapeHtml(value)}</span>\`;
             } else if (c.id === 'inventory_url' && value) {
-              value = \`<a href="\${value}" target="_blank">View</a>\`;
+              value = \`<a href="\${escapeHtml(value)}" target="_blank">View</a>\`;
+            } else {
+              value = escapeHtml(value);
             }
             return \`<td class="\${c.sticky ? 'sticky-col' : ''}">\${value}</td>\`;
           }).join('');
@@ -614,7 +625,7 @@ app.get('/app/counties', requireAuth, (req, res) => {
       } else {
         visibleColumns.push(columnId);
       }
-      localStorage.setItem('counties-columns', JSON.stringify(visibleColumns));
+      localStorage.setItem('wbc-counties-cols', JSON.stringify(visibleColumns));
       renderTable();
     }
     
