@@ -787,7 +787,33 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
         ${county.inventory_received_date ? `<p><strong>Inventory Received:</strong> ${county.inventory_received_date}</p>` : ''}
       </div>
 
-      <details class="tac-contact-section">
+      <h3>Replies / Inbox (${emails.length})</h3>
+      <div class="replies-section">
+        ${emailsHtml}
+      </div>
+
+      <h3>Send History (${logs.length})</h3>
+      <div class="logs">
+        ${logsHtml}
+      </div>
+
+      ${canSend ? `
+        <h3>Send Email</h3>
+        <form method="POST" action="/app/county/${county.id}/preview" target="_blank">
+          <button type="submit" class="btn btn-primary">Preview Email</button>
+        </form>
+        <form method="POST" action="/app/county/${county.id}/send" onsubmit="return confirm('Send email to ${county.tac_email}?');">
+          <button type="submit" class="btn btn-success">Send Email Now</button>
+        </form>
+        <p class="info">Daily sends: ${todaySends}/${dailyCap}</p>
+      ` : `
+        <div class="warning">
+          ${!county.tac_email ? '<p>⚠ No TAC email address on file</p>' : ''}
+          ${todaySends >= dailyCap ? `<p>⚠ Daily send cap reached (${todaySends}/${dailyCap})</p>` : ''}
+        </div>
+      `}
+
+      <details id="tac-details" class="tac-contact-section" open>
         <summary>${tacSummary}</summary>
         <form method="POST" action="/app/county/${county.id}/update">
           <label>TAC Name</label>
@@ -821,33 +847,28 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
           <button type="submit">Update County</button>
         </form>
       </details>
-
-      ${canSend ? `
-        <h3>Send Email</h3>
-        <form method="POST" action="/app/county/${county.id}/preview" target="_blank">
-          <button type="submit" class="btn btn-primary">Preview Email</button>
-        </form>
-        <form method="POST" action="/app/county/${county.id}/send" onsubmit="return confirm('Send email to ${county.tac_email}?');">
-          <button type="submit" class="btn btn-success">Send Email Now</button>
-        </form>
-        <p class="info">Daily sends: ${todaySends}/${dailyCap}</p>
-      ` : `
-        <div class="warning">
-          ${!county.tac_email ? '<p>⚠ No TAC email address on file</p>' : ''}
-          ${todaySends >= dailyCap ? `<p>⚠ Daily send cap reached (${todaySends}/${dailyCap})</p>` : ''}
-        </div>
-      `}
-
-      <h3>Replies / Inbox (${emails.length})</h3>
-      <div class="replies-section">
-        ${emailsHtml}
-      </div>
-
-      <h3>Send History (${logs.length})</h3>
-      <div class="logs">
-        ${logsHtml}
-      </div>
     </div>
+    
+    <script>
+    // TAC details localStorage persistence
+    (function() {
+      const countyId = ${county.id};
+      const storageKey = 'wbc-tac-open-' + countyId;
+      const details = document.getElementById('tac-details');
+      
+      // Restore saved state on load
+      const saved = localStorage.getItem(storageKey);
+      if (saved === '0') {
+        details.removeAttribute('open');
+      }
+      // If '1' or missing, stays open (default)
+      
+      // Save state on toggle
+      details.addEventListener('toggle', function() {
+        localStorage.setItem(storageKey, details.open ? '1' : '0');
+      });
+    })();
+    </script>
   `;
   
   res.send(renderPage(county.name + ' County', content));
