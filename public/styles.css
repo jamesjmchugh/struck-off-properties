@@ -640,3 +640,129 @@ button[type="submit"]:hover {
   border: none;
   border-top: 2px solid #e0ddd5;
 }
+
+/* Counties page map & controls */
+.container-full {
+  max-width: 100%;
+  padding: 1.5rem;
+}
+
+#map {
+  background: #f7f3ea;
+  border: 2px solid #002147;
+}
+
+.counties-controls {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #002147;
+  margin-bottom: 1.5rem;
+}
+
+.control-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.control-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+}
+
+.control-group label {
+  font-weight: 600;
+  color: #002147;
+  white-space: nowrap;
+}
+
+.control-group input,
+.control-group select {
+  flex: 1;
+}
+
+.column-picker {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #002147;
+  margin-bottom: 1.5rem;
+}
+
+.column-picker h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #002147;
+}
+
+.column-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.column-grid label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.column-grid label.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.count-badge {
+  font-size: 0.85em;
+  font-weight: 500;
+  color: #666;
+  margin-left: 0.5rem;
+}
+
+/* Table with sticky column */
+.table-container {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 2px solid #002147;
+}
+
+#counties-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#counties-table th,
+#counties-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+  white-space: nowrap;
+}
+
+#counties-table th {
+  background: #002147;
+  color: white;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+#counties-table .sticky-col {
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 5;
+}
+
+#counties-table th.sticky-col {
+  background: #002147;
+  z-index: 15;
+}

@@ -360,70 +360,330 @@ app.get('/app', requireAuth, (req, res) => {
   res.send(renderPage('Dashboard', content));
 });
 
-// Counties list
+// Counties list - FULL IMPLEMENTATION with map + filters
 app.get('/app/counties', requireAuth, (req, res) => {
-  const { filter } = req.query;
-  let counties = [];
-  let title = 'All Counties';
-
-  switch (filter) {
-    case 'not_contacted':
-      counties = db.getCounties({ status: 'Not contacted' });
-      title = 'Not Contacted';
-      break;
-    case 'due_followup':
-      counties = db.getCounties({ dueFollowup: true });
-      title = 'Due Follow-up';
-      break;
-    case 'emailed':
-      counties = db.getCounties({ status: 'Emailed' });
-      title = 'Waiting (Emailed)';
-      break;
-    case 'has_inventory':
-      counties = db.getCounties({ hasInventory: true });
-      title = 'Has Inventory';
-      break;
-    default:
-      counties = db.getCounties();
-      title = 'All Counties';
-  }
-
-  const rows = counties.map(c => `
-    <tr>
-      <td><a href="/app/county/${c.id}">${c.name}</a></td>
-      <td>${c.seat || ''}</td>
-      <td>${c.fips}</td>
-      <td>${c.tac_email || ''}</td>
-      <td><span class="badge badge-${c.outreach_status.toLowerCase().replace(' ', '-')}">${c.outreach_status}</span></td>
-      <td>${c.last_emailed || '-'}</td>
-      <td>${c.next_followup || '-'}</td>
-    </tr>
-  `).join('');
-
+  // Get ALL counties with all fields - will filter client-side
+  const counties = db.getCounties();
+  
   const content = `
-    <div class="container">
-      <h2>${title} (${counties.length})</h2>
+    <div class="container-full">
+      <h2>All Texas Counties <span class="count-badge" id="count-display">254 of 254</span></h2>
       
-      <table>
-        <thead>
-          <tr>
-            <th>County</th>
-            <th>Seat</th>
-            <th>FIPS</th>
-            <th>TAC Email</th>
-            <th>Status</th>
-            <th>Last Emailed</th>
-            <th>Next Follow-up</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows}
-        </tbody>
-      </table>
+      <!-- Map Container -->
+      <div id="map" style="height: 400px; margin-bottom: 2rem; border-radius: 12px; overflow: hidden;"></div>
+      
+      <!-- Controls -->
+      <div class="counties-controls">
+        <div class="control-row">
+          <div class="control-group">
+            <label>Search:</label>
+            <select id="search-column">
+              <option value="_all">All Columns</option>
+              <option value="name">County</option>
+              <option value="seat">Seat</option>
+              <option value="tac_name">TAC Name</option>
+              <option value="tac_email">TAC Email</option>
+              <option value="county_judge">Judge</option>
+              <option value="sheriff">Sheriff</option>
+              <option value="notes">Notes</option>
+            </select>
+            <input type="text" id="search-input" placeholder="Search..." />
+            <button onclick="clearFilters()">Clear</button>
+          </div>
+          
+          <div class="control-group">
+            <label>Last Emailed:</label>
+            <select id="filter-emailed" onchange="applyFilters()">
+              <option value="any">Any</option>
+              <option value="never">Never</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="over90">Over 90 days</option>
+            </select>
+          </div>
+          
+          <div class="control-group">
+            <label>Last Replied:</label>
+            <select id="filter-replied" onchange="applyFilters()">
+              <option value="any">Any</option>
+              <option value="never">Never</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="over90">Over 90 days</option>
+            </select>
+          </div>
+          
+          <button onclick="toggleColumnPicker()" class="btn-secondary">Columns</button>
+        </div>
+      </div>
+      
+      <!-- Column Picker -->
+      <div id="column-picker" class="column-picker" style="display:none;">
+        <h4>Show/Hide Columns</h4>
+        <div class="column-grid" id="column-checkboxes"></div>
+      </div>
+      
+      <!-- Table -->
+      <div class="table-container">
+        <table id="counties-table">
+          <thead>
+            <tr id="table-header"></tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
     </div>
+    
+    <!-- Data -->
+    <script type="application/json" id="counties-data">
+    ${JSON.stringify(counties)}
+    </script>
+    
+    <!-- Leaflet CSS/JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+    // Parse data
+    const countiesData = JSON.parse(document.getElementById('counties-data').textContent);
+    
+    // Column definitions
+    const columns = [
+      {id: 'name', label: 'County', defaultVisible: true, sticky: true},
+      {id: 'seat', label: 'Seat', defaultVisible: true},
+      {id: 'fips', label: 'FIPS', defaultVisible: false},
+      {id: 'outreach_status', label: 'Status', defaultVisible: true},
+      {id: 'research_status', label: 'Research', defaultVisible: false},
+      {id: 'tac_name', label: 'TAC', defaultVisible: true},
+      {id: 'tac_email', label: 'TAC Email', defaultVisible: true},
+      {id: 'tac_phone', label: 'TAC Phone', defaultVisible: false},
+      {id: 'county_judge', label: 'Judge', defaultVisible: true},
+      {id: 'judge_email', label: 'Judge Email', defaultVisible: false},
+      {id: 'sheriff', label: 'Sheriff', defaultVisible: true},
+      {id: 'sheriff_email', label: 'Sheriff Email', defaultVisible: false},
+      {id: 'attorney_email', label: 'Attorney Email', defaultVisible: false},
+      {id: 'collection_firm', label: 'Collection Firm', defaultVisible: false},
+      {id: 'primary_outreach_email', label: 'Primary Email', defaultVisible: false},
+      {id: 'primary_contact_office', label: 'Primary Office', defaultVisible: false},
+      {id: 'auction_officer', label: 'Auction Officer', defaultVisible: false},
+      {id: 'resale_type', label: 'Resale Type', defaultVisible: false},
+      {id: 'struck_off_holder', label: 'Struck-off Holder', defaultVisible: false},
+      {id: 'inventory_url', label: 'Inventory URL', defaultVisible: false},
+      {id: 'last_emailed', label: 'Last Emailed', defaultVisible: true},
+      {id: 'last_replied', label: 'Last Replied', defaultVisible: false},
+      {id: 'next_followup', label: 'Next Follow-up', defaultVisible: true},
+      {id: 'inventory_received_date', label: 'Inventory Date', defaultVisible: false}
+    ];
+    
+    // Load column visibility from localStorage
+    const savedColumns = localStorage.getItem('counties-columns');
+    const visibleColumns = savedColumns ? JSON.parse(savedColumns) : 
+      columns.filter(c => c.defaultVisible).map(c => c.id);
+    
+    let filteredCounties = [...countiesData];
+    let map, geoJsonLayer;
+    
+    // Status colors (Wild Boar Creek palette)
+    const statusColors = {
+      'Not contacted': '#e9ecef',
+      'Emailed': '#cce5ff',
+      'Replied': '#c8e6f5',
+      'List received': '#d4f4dd',
+      'Offer in play': '#fff3cd',
+      'Closed': '#d6d8db'
+    };
+    
+    // Initialize map
+    function initMap() {
+      map = L.map('map').setView([31.5, -99.5], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+      
+      fetch('/geojson/texas-counties.json')
+        .then(r => r.json())
+        .then(geojson => {
+          geoJsonLayer = L.geoJSON(geojson, {
+            style: feature => ({
+              fillColor: getCountyColor(feature.properties.FIPS),
+              fillOpacity: 0.7,
+              color: '#002147',
+              weight: 1
+            }),
+            onEachFeature: (feature, layer) => {
+              const county = countiesData.find(c => c.fips === feature.properties.FIPS);
+              if (county) {
+                layer.bindTooltip(\`\${county.name}: \${county.outreach_status}\`);
+                layer.on('click', () => {
+                  if (isCountyVisible(county)) {
+                    window.location.href = \`/app/county/\${county.id}\`;
+                  }
+                });
+              }
+            }
+          }).addTo(map);
+          updateMapColors();
+        });
+    }
+    
+    function getCountyColor(fips) {
+      const county = countiesData.find(c => c.fips === fips);
+      if (!county) return '#ccc';
+      const visible = isCountyVisible(county);
+      const color = statusColors[county.outreach_status] || '#ccc';
+      return visible ? color : '#f5f5f5';
+    }
+    
+    function isCountyVisible(county) {
+      return filteredCounties.some(c => c.id === county.id);
+    }
+    
+    function updateMapColors() {
+      if (geoJsonLayer) {
+        geoJsonLayer.eachLayer(layer => {
+          const fips = layer.feature.properties.FIPS;
+          layer.setStyle({
+            fillColor: getCountyColor(fips),
+            fillOpacity: isCountyVisible(countiesData.find(c => c.fips === fips)) ? 0.7 : 0.2
+          });
+        });
+      }
+    }
+    
+    // Render table
+    function renderTable() {
+      const header = document.getElementById('table-header');
+      const body = document.getElementById('table-body');
+      
+      // Header
+      header.innerHTML = columns
+        .filter(c => visibleColumns.includes(c.id))
+        .map(c => \`<th class="\${c.sticky ? 'sticky-col' : ''}">\${c.label}</th>\`)
+        .join('');
+      
+      // Body
+      body.innerHTML = filteredCounties.map(county => {
+        const cells = columns
+          .filter(c => visibleColumns.includes(c.id))
+          .map(c => {
+            let value = county[c.id] || '';
+            if (c.id === 'name') {
+              value = \`<a href="/app/county/\${county.id}">\${value}</a>\`;
+            } else if (c.id === 'outreach_status') {
+              value = \`<span class="badge badge-\${value.toLowerCase().replace(' ', '-')}">\${value}</span>\`;
+            } else if (c.id === 'inventory_url' && value) {
+              value = \`<a href="\${value}" target="_blank">View</a>\`;
+            }
+            return \`<td class="\${c.sticky ? 'sticky-col' : ''}">\${value}</td>\`;
+          }).join('');
+        return \`<tr>\${cells}</tr>\`;
+      }).join('');
+      
+      document.getElementById('count-display').textContent = \`\${filteredCounties.length} of \${countiesData.length}\`;
+    }
+    
+    // Render column picker
+    function renderColumnPicker() {
+      const container = document.getElementById('column-checkboxes');
+      container.innerHTML = columns.map(c => \`
+        <label class="\${c.sticky ? 'disabled' : ''}">
+          <input type="checkbox" 
+            value="\${c.id}" 
+            \${visibleColumns.includes(c.id) ? 'checked' : ''}
+            \${c.sticky ? 'disabled' : ''}
+            onchange="toggleColumn('\${c.id}')">
+          \${c.label}
+        </label>
+      \`).join('');
+    }
+    
+    function toggleColumn(columnId) {
+      const index = visibleColumns.indexOf(columnId);
+      if (index > -1) {
+        visibleColumns.splice(index, 1);
+      } else {
+        visibleColumns.push(columnId);
+      }
+      localStorage.setItem('counties-columns', JSON.stringify(visibleColumns));
+      renderTable();
+    }
+    
+    function toggleColumnPicker() {
+      const picker = document.getElementById('column-picker');
+      picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    // Filters
+    function applyFilters() {
+      const searchCol = document.getElementById('search-column').value;
+      const searchTerm = document.getElementById('search-input').value.toLowerCase();
+      const emailedFilter = document.getElementById('filter-emailed').value;
+      const repliedFilter = document.getElementById('filter-replied').value;
+      
+      filteredCounties = countiesData.filter(county => {
+        // Search
+        if (searchTerm) {
+          if (searchCol === '_all') {
+            const allText = Object.values(county).join(' ').toLowerCase();
+            if (!allText.includes(searchTerm)) return false;
+          } else {
+            const val = (county[searchCol] || '').toLowerCase();
+            if (!val.includes(searchTerm)) return false;
+          }
+        }
+        
+        // Last emailed
+        if (!matchesDateFilter(county.last_emailed, emailedFilter)) return false;
+        
+        // Last replied
+        if (!matchesDateFilter(county.last_replied, repliedFilter)) return false;
+        
+        return true;
+      });
+      
+      renderTable();
+      updateMapColors();
+    }
+    
+    function matchesDateFilter(dateStr, filter) {
+      if (filter === 'any') return true;
+      if (filter === 'never') return !dateStr;
+      if (!dateStr) return false;
+      
+      const date = new Date(dateStr);
+      const now = new Date();
+      const daysDiff = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+      
+      if (filter === '7') return daysDiff <= 7;
+      if (filter === '30') return daysDiff <= 30;
+      if (filter === '90') return daysDiff <= 90;
+      if (filter === 'over90') return daysDiff > 90;
+      
+      return true;
+    }
+    
+    function clearFilters() {
+      document.getElementById('search-input').value = '';
+      document.getElementById('search-column').value = '_all';
+      document.getElementById('filter-emailed').value = 'any';
+      document.getElementById('filter-replied').value = 'any';
+      applyFilters();
+    }
+    
+    // Event listeners
+    document.getElementById('search-input').addEventListener('input', applyFilters);
+    document.getElementById('search-column').addEventListener('change', applyFilters);
+    
+    // Initialize
+    initMap();
+    renderColumnPicker();
+    renderTable();
+    </script>
   `;
   
-  res.send(renderPage(title, content));
+  res.send(renderPage('All Counties', content));
 });
 
 // County detail
