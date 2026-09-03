@@ -69,14 +69,14 @@ nav .nav-links {
 nav .nav-links a {
   color: #f7f3ea;
   text-decoration: none;
-  padding: 0 0.85rem;
+  padding: 0;
   font-weight: 400;
   transition: opacity 0.2s;
 }
 
 nav .nav-links a + a::before {
   content: "|";
-  margin-right: 0.85rem;
+  margin: 0 0.5rem;
   opacity: 0.45;
 }
 
