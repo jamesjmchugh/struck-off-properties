@@ -92,8 +92,45 @@ async function sendEmail(county) {
   return result;
 }
 
+// Send reply to inbound email via Resend
+async function sendReply({ county, to, subject, text, inReplyTo, references }) {
+  const resend = getResendClient();
+
+  const payload = {
+    from: FROM_EMAIL,
+    to: to,
+    subject: subject,
+    text: text,
+    headers: {}
+  };
+
+  // Add threading headers if provided
+  if (inReplyTo) {
+    payload.headers['In-Reply-To'] = inReplyTo;
+  }
+  if (references) {
+    payload.headers['References'] = references;
+  }
+
+  // Send the email via Resend
+  const result = await resend.emails.send(payload);
+  console.log(`Reply sent to ${to} via Resend: ${result.id}`);
+
+  // Log the send
+  const today = new Date().toISOString().split('T')[0];
+  addSendLog(county.id, to, subject, text);
+
+  // Update last_emailed (but NOT outreach_status)
+  updateCounty(county.id, {
+    last_emailed: today
+  });
+
+  return result;
+}
+
 module.exports = {
   sendEmail,
+  sendReply,
   mergeTemplate,
   getNextFollowupDate
 };

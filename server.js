@@ -689,6 +689,11 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
 
   const emailsHtml = emails.length > 0 ? emails.map(email => {
     const readableBody = extractReadableBody(email.text, email.snippet);
+    const replySubject = email.subject && !email.subject.startsWith('Re:') 
+      ? `Re: ${email.subject}` 
+      : email.subject || 'Re: (no subject)';
+    const quotedBody = readableBody.split('\n').map(line => `> ${line}`).join('\n');
+    
     return `
       <div class="email-reply">
         <div class="email-header">
@@ -701,6 +706,27 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
         <div class="email-body">
           <pre>${readableBody}</pre>
         </div>
+        
+        <details class="reply-form">
+          <summary>Reply</summary>
+          <form method="POST" action="/app/county/${county.id}/reply">
+            <input type="hidden" name="email_id" value="${email.id}">
+            <input type="hidden" name="to" value="${email.from_addr}">
+            <input type="hidden" name="in_reply_to" value="${email.message_id || ''}">
+            <input type="hidden" name="references" value="${email.message_id || ''}">
+            
+            <label>To</label>
+            <input type="email" name="to_display" value="${email.from_addr}" disabled>
+            
+            <label>Subject</label>
+            <input type="text" name="subject" value="${replySubject}" required>
+            
+            <label>Message</label>
+            <textarea name="text" rows="8" required>\n\n---\n${quotedBody}</textarea>
+            
+            <button type="submit" class="btn btn-primary">Send Reply</button>
+          </form>
+        </details>
       </div>
     `;
   }).join('') : '<p>No replies received yet</p>';
@@ -715,6 +741,7 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
 
   const content = `
     <div class="container">
+      ${req.query.replied === '1' ? '<div class="success-message">✓ Reply sent successfully</div>' : ''}
       <h2>${county.name} County</h2>
       
       <div class="county-details">
@@ -877,6 +904,42 @@ app.post('/app/county/:id/send', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Send error:', error);
     res.status(500).send(`Failed to send email: ${error.message}`);
+  }
+});
+
+// Reply to inbound email from county page
+app.post('/app/county/:id/reply', requireAuth, async (req, res) => {
+  const dailyCap = parseInt(process.env.SEND_DAILY_CAP || '5');
+  const todaySends = db.getTodaySendCount();
+
+  if (todaySends >= dailyCap) {
+    return res.status(429).send(`Daily send cap reached (${todaySends}/${dailyCap})`);
+  }
+
+  const county = db.getCountyById(req.params.id);
+  if (!county) {
+    return res.status(404).send('County not found');
+  }
+
+  const { to, subject, text, in_reply_to, references } = req.body;
+
+  try {
+    await emailService.sendReply({
+      county,
+      to,
+      subject,
+      text,
+      inReplyTo: in_reply_to,
+      references
+    });
+    
+    // Log activity: replied
+    db.addActivity('emailed', county.id, null, `Reply sent to ${to}`);
+    
+    res.redirect(`/app/county/${req.params.id}?replied=1`);
+  } catch (error) {
+    console.error('Reply error:', error);
+    res.status(500).send(`Failed to send reply: ${error.message}`);
   }
 });
 
@@ -1057,8 +1120,14 @@ app.get('/app/inbox/:id', requireAuth, (req, res) => {
     `<option value="${c.id}" ${email.county_id === c.id ? 'selected' : ''}>${c.name}</option>`
   ).join('');
 
+  const replySubject = email.subject && !email.subject.startsWith('Re:') 
+    ? `Re: ${email.subject}` 
+    : email.subject || 'Re: (no subject)';
+  const quotedBody = (email.text || email.snippet || '').split('\n').map(line => `> ${line}`).join('\n');
+
   const content = `
     <div class="container">
+      ${req.query.replied === '1' ? '<div class="success-message">✓ Reply sent successfully</div>' : ''}
       <h2>Email Detail</h2>
       
       <div class="email-detail">
@@ -1074,6 +1143,26 @@ app.get('/app/inbox/:id', requireAuth, (req, res) => {
         <h3>Message</h3>
         <pre class="email-body">${email.text || email.snippet || '(no content)'}</pre>
       </div>
+      
+      <details class="reply-form">
+        <summary>Reply to ${email.from_addr}</summary>
+        <form method="POST" action="/app/inbox/${email.id}/reply">
+          <input type="hidden" name="to" value="${email.from_addr}">
+          <input type="hidden" name="in_reply_to" value="${email.message_id || ''}">
+          <input type="hidden" name="references" value="${email.message_id || ''}">
+          
+          <label>To</label>
+          <input type="email" name="to_display" value="${email.from_addr}" disabled>
+          
+          <label>Subject</label>
+          <input type="text" name="subject" value="${replySubject}" required>
+          
+          <label>Message</label>
+          <textarea name="text" rows="8" required>\n\n---\n${quotedBody}</textarea>
+          
+          <button type="submit" class="btn btn-primary">Send Reply</button>
+        </form>
+      </details>
       
       <h3>Actions</h3>
       <form method="POST" action="/app/inbox/${email.id}/assign" class="inline-form">
@@ -1144,6 +1233,58 @@ app.post('/app/inbox/:id/assign', requireAuth, (req, res) => {
 app.post('/app/inbox/:id/close', requireAuth, (req, res) => {
   db.updateEmail(req.params.id, { status: 'closed' });
   res.redirect(`/app/inbox/${req.params.id}`);
+});
+
+// Reply to inbox email
+app.post('/app/inbox/:id/reply', requireAuth, async (req, res) => {
+  const dailyCap = parseInt(process.env.SEND_DAILY_CAP || '5');
+  const todaySends = db.getTodaySendCount();
+
+  if (todaySends >= dailyCap) {
+    return res.status(429).send(`Daily send cap reached (${todaySends}/${dailyCap})`);
+  }
+
+  const email = db.getEmailById(req.params.id);
+  if (!email) {
+    return res.status(404).send('Email not found');
+  }
+
+  // Determine which county to log this under
+  let county;
+  if (email.county_id) {
+    county = db.getCountyById(email.county_id);
+  }
+  
+  // If no county assigned, we can't send (need a county for logging)
+  if (!county) {
+    return res.status(400).send('Email must be assigned to a county before replying');
+  }
+
+  const { to, subject, text, in_reply_to, references } = req.body;
+
+  try {
+    await emailService.sendReply({
+      county,
+      to,
+      subject,
+      text,
+      inReplyTo: in_reply_to,
+      references
+    });
+    
+    // Log activity
+    db.addActivity('emailed', county.id, email.id, `Reply sent to ${to}`);
+    
+    // Redirect to county if assigned, else back to inbox detail
+    if (email.county_id) {
+      res.redirect(`/app/county/${email.county_id}?replied=1`);
+    } else {
+      res.redirect(`/app/inbox/${req.params.id}?replied=1`);
+    }
+  } catch (error) {
+    console.error('Reply error:', error);
+    res.status(500).send(`Failed to send reply: ${error.message}`);
+  }
 });
 
 // Email template editor

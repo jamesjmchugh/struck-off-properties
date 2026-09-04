@@ -934,3 +934,56 @@ footer .fine {
   border-radius: 8px;
   border: 2px solid #002147;
 }
+
+/* Reply form */
+.reply-form {
+  margin-top: 1.5rem;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 2px solid #002147;
+}
+
+.reply-form summary {
+  font-weight: 600;
+  color: #002147;
+  cursor: pointer;
+  font-size: 1rem;
+  margin: -0.5rem;
+  padding: 0.5rem;
+}
+
+.reply-form summary:hover {
+  opacity: 0.7;
+}
+
+.reply-form[open] summary {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e0ddd5;
+}
+
+.reply-form form {
+  margin-top: 0;
+}
+
+.reply-form textarea {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+.reply-form input[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Success message */
+.success-message {
+  background: #d4f4dd;
+  color: #002147;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 2px solid #4a7c9e;
+  margin-bottom: 1.5rem;
+  font-weight: 500;
+}
