@@ -1,0 +1,26 @@
+[Unit]
+Description=Wild Boar Creek CRM
+After=network.target
+
+[Service]
+Type=simple
+User=nodejs
+WorkingDirectory=/home/nodejs/wildboarcreek-crm
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+EnvironmentFile=/home/nodejs/wildboarcreek-crm/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/wildboarcreek-crm/app.log
+StandardError=append:/var/log/wildboarcreek-crm/error.log
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/nodejs/wildboarcreek-crm
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

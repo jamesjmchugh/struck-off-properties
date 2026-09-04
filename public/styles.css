@@ -1,0 +1,989 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+  color: #002147;
+  background: #f7f3ea;
+  background-image: 
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 33, 71, 0.02) 0px,
+      transparent 1px,
+      transparent 2px,
+      rgba(0, 33, 71, 0.02) 3px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 33, 71, 0.02) 0px,
+      transparent 1px,
+      transparent 2px,
+      rgba(0, 33, 71, 0.02) 3px
+    );
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+}
+
+nav {
+  background: #002147;
+  color: #f7f3ea;
+  padding: 1.5rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+}
+
+nav h1 {
+  font-size: 1.375rem;
+  font-weight: 500;
+  font-family: 'Fraunces', Georgia, serif;
+  letter-spacing: 0.04em;
+}
+
+nav h1 a {
+  color: #f7f3ea;
+  text-decoration: none;
+}
+
+nav .nav-links {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+nav .nav-links a {
+  color: #f7f3ea;
+  text-decoration: none;
+  padding: 0;
+  font-weight: 400;
+  transition: opacity 0.2s;
+}
+
+nav .nav-links a + a::before {
+  content: "|";
+  margin: 0 0.5rem;
+  opacity: 0.45;
+}
+
+nav .nav-links a:hover {
+  opacity: 0.7;
+}
+
+.badge-count {
+  background: #d4a574;
+  color: #002147;
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: 0.25rem;
+}
+
+.inbox-filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.filter-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filter-btn {
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 2px solid #e0ddd5;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #002147;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  border-color: #002147;
+}
+
+.filter-btn.active {
+  background: #002147;
+  color: #f7f3ea;
+  border-color: #002147;
+}
+
+.search-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.search-form input[type="text"] {
+  width: 300px;
+}
+
+.btn-clear {
+  padding: 0.5rem 1rem;
+  background: #e0ddd5;
+  color: #002147;
+  text-decoration: none;
+  border-radius: 6px;
+  border: none;
+  font-weight: 500;
+}
+
+.to-addr {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.muted {
+  color: #999;
+}
+
+.email-detail {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+  margin-bottom: 2rem;
+}
+
+.email-detail hr {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 2px solid #e0ddd5;
+}
+
+.email-body {
+  background: #fafaf8;
+  padding: 1.5rem;
+  border-radius: 8px;
+  max-height: 500px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.inline-form {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.inline-form label {
+  margin-top: 0;
+}
+
+.inline-form select,
+.inline-form input {
+  width: auto;
+  min-width: 200px;
+}
+
+.btn-secondary {
+  background: #666;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #555;
+}
+
+.activity-feed {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+  margin-top: 2rem;
+}
+
+.activity-item {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-item .time {
+  color: #666;
+  font-size: 0.875rem;
+  margin-right: 1rem;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+}
+
+.login-box {
+  max-width: 420px;
+  margin: 4rem auto;
+  background: white;
+  padding: 3rem 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 33, 71, 0.15);
+  text-align: center;
+}
+
+.login-box .logo {
+  margin-bottom: 1.5rem;
+}
+
+.login-box h1 {
+  margin-bottom: 0.5rem;
+  font-size: 2rem;
+  color: #002147;
+  font-weight: 700;
+}
+
+.login-box .tagline {
+  color: #666;
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 300;
+}
+
+.login-box form {
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  text-align: left;
+}
+
+h2 {
+  margin-bottom: 1.5rem;
+  color: #002147;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+h3 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: #002147;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: white;
+  padding: 2rem 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+  text-align: center;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 33, 71, 0.15);
+  transform: translateY(-2px);
+}
+
+.stat-card.highlight {
+  background: #fffbf0;
+  border-color: #d4a574;
+}
+
+.stat-card.success {
+  background: #f0f8f4;
+  border-color: #5a8f7b;
+}
+
+.stat-card h3 {
+  margin: 0;
+  font-size: 3rem;
+  color: #002147;
+  font-weight: 700;
+}
+
+.stat-card p {
+  margin: 0.75rem 0;
+  color: #4a5568;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+}
+
+.stat-card a {
+  color: #002147;
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 2px solid #002147;
+  padding-bottom: 2px;
+  transition: opacity 0.2s;
+}
+
+.stat-card a:hover {
+  opacity: 0.7;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.875rem 1.75rem;
+  background: #002147;
+  color: #f7f3ea;
+  text-decoration: none;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  text-align: center;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn:hover {
+  background: #003366;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.2);
+}
+
+.btn-primary {
+  background: #4a7c9e;
+}
+
+.btn-primary:hover {
+  background: #5a8fb0;
+}
+
+.btn-success {
+  background: #5a8f7b;
+}
+
+.btn-success:hover {
+  background: #6aa088;
+}
+
+table {
+  width: 100%;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+  margin-top: 1rem;
+}
+
+thead {
+  background: #002147;
+  color: #f7f3ea;
+}
+
+th {
+  padding: 1rem 1.25rem;
+  text-align: left;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+}
+
+td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+td a {
+  color: #002147;
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+td a:hover {
+  border-bottom-color: #002147;
+}
+
+.badge {
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-not-contacted {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.badge-emailed {
+  background: #d4e4f7;
+  color: #1a5490;
+}
+
+.badge-replied {
+  background: #c8e6f5;
+  color: #0a4f7a;
+}
+
+.badge-list-received {
+  background: #d4f4dd;
+  color: #1b5e2f;
+}
+
+.badge-offer-in-play {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.badge-closed {
+  background: #d6d8db;
+  color: #1b1e21;
+}
+
+.county-details {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+  margin-bottom: 2rem;
+}
+
+.county-details p {
+  margin: 0.75rem 0;
+}
+
+form {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+  margin-bottom: 2rem;
+}
+
+label {
+  display: block;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #002147;
+  font-size: 0.95rem;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="date"],
+input[type="password"],
+input[type="file"],
+select,
+textarea {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 2px solid #e0ddd5;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: #fafaf8;
+  color: #002147;
+  transition: all 0.2s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #002147;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(0, 33, 71, 0.05);
+}
+
+button[type="submit"] {
+  margin-top: 1.5rem;
+  padding: 0.875rem 2rem;
+  background: #002147;
+  color: #f7f3ea;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+button[type="submit"]:hover {
+  background: #003366;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.2);
+}
+
+.info {
+  color: #666;
+  font-size: 0.875rem;
+  margin-top: 0.75rem;
+  font-style: italic;
+}
+
+.error {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 0.875rem 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+  border: 1px solid #f5c6cb;
+}
+
+.warning {
+  background: #fff3cd;
+  color: #856404;
+  padding: 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+  border: 1px solid #ffeaa7;
+}
+
+.success {
+  background: #d4edda;
+  color: #155724;
+  padding: 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+  border: 1px solid #c3e6cb;
+}
+
+.info-box {
+  background: #e8f4f8;
+  border-left: 4px solid #4a7c9e;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border-radius: 8px;
+}
+
+.info-box h3 {
+  margin-top: 0;
+  color: #002147;
+  font-size: 1.25rem;
+}
+
+.info-box ul {
+  margin-left: 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.info-box li {
+  margin-bottom: 0.5rem;
+}
+
+.info-box code {
+  background: #f8f9fa;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  color: #002147;
+  font-size: 0.9rem;
+}
+
+.logs {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+}
+
+.log-entry {
+  padding: 1.25rem;
+  border-left: 3px solid #4a7c9e;
+  background: #fafaf8;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+}
+
+.log-entry:last-child {
+  margin-bottom: 0;
+}
+
+.email-preview {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 33, 71, 0.1);
+  margin: 2rem 0;
+}
+
+.email-preview pre {
+  white-space: pre-wrap;
+  font-family: inherit;
+  margin-top: 1.5rem;
+  line-height: 1.8;
+  padding: 1.5rem;
+  background: #fafaf8;
+  border-radius: 8px;
+  border: 1px solid #e0ddd5;
+}
+
+.email-preview hr {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 2px solid #e0ddd5;
+}
+
+/* Counties page map & controls */
+.container-full {
+  max-width: 100%;
+  padding: 1.5rem;
+}
+
+#map {
+  background: #f7f3ea;
+  border: 2px solid #002147;
+}
+
+.counties-controls {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #002147;
+  margin-bottom: 1.5rem;
+}
+
+.control-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.control-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+}
+
+.control-group label {
+  font-weight: 600;
+  color: #002147;
+  white-space: nowrap;
+}
+
+.control-group input,
+.control-group select {
+  flex: 1;
+}
+
+.column-picker {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #002147;
+  margin-bottom: 1.5rem;
+}
+
+.column-picker h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #002147;
+}
+
+.column-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.column-grid label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.column-grid label.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.count-badge {
+  font-size: 0.85em;
+  font-weight: 500;
+  color: #666;
+  margin-left: 0.5rem;
+}
+
+/* Table with sticky column */
+.table-container {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 2px solid #002147;
+}
+
+#counties-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#counties-table th,
+#counties-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+  white-space: nowrap;
+}
+
+#counties-table th {
+  background: #002147;
+  color: white;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+#counties-table .sticky-col {
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 5;
+}
+
+#counties-table th.sticky-col {
+  background: #002147;
+  z-index: 15;
+}
+
+/* Footer */
+footer {
+  background: #002147;
+  color: #f7f3ea;
+  text-align: center;
+  padding: 2rem 1.25rem 2.25rem;
+  margin-top: 4rem;
+}
+
+footer p {
+  margin-bottom: 0.75rem;
+}
+
+footer p:last-child {
+  margin-bottom: 0;
+}
+
+footer .name {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+footer a {
+  color: #f7f3ea;
+  text-decoration: underline;
+  text-decoration-color: rgba(247, 243, 234, 0.35);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.2s;
+}
+
+footer a:hover {
+  text-decoration-color: rgba(247, 243, 234, 1);
+}
+
+footer .fine {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin-top: 1rem;
+}
+
+/* County detail: collapsible TAC section */
+.tac-contact-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #002147;
+  margin: 2rem 0;
+}
+
+.tac-contact-section summary {
+  font-weight: 600;
+  color: #002147;
+  cursor: pointer;
+  font-size: 1.1rem;
+  margin: -0.5rem;
+  padding: 0.5rem;
+  list-style-position: outside;
+}
+
+.tac-contact-section summary:hover {
+  opacity: 0.7;
+}
+
+.tac-contact-section[open] summary {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e0ddd5;
+}
+
+.tac-contact-section form {
+  margin-top: 0;
+}
+
+/* Replies / Inbox section */
+.replies-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #002147;
+  margin: 1.5rem 0;
+}
+
+.email-reply {
+  background: #fafaf8;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border-left: 3px solid #4a7c9e;
+  margin-bottom: 1.5rem;
+}
+
+.email-reply:last-child {
+  margin-bottom: 0;
+}
+
+.email-header {
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+  color: #666;
+}
+
+.email-header a {
+  color: #002147;
+  font-weight: 500;
+}
+
+.email-reply p {
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.email-body {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0ddd5;
+}
+
+.email-body pre {
+  white-space: pre-wrap;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+  color: #002147;
+}
+
+/* County locator map */
+.county-map {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.county-map img {
+  max-width: 100%;
+  height: auto;
+  max-height: 400px;
+  border-radius: 8px;
+  border: 2px solid #002147;
+}
+
+/* Reply form */
+.reply-form {
+  margin-top: 1.5rem;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 2px solid #002147;
+}
+
+.reply-form summary {
+  font-weight: 600;
+  color: #002147;
+  cursor: pointer;
+  font-size: 1rem;
+  margin: -0.5rem;
+  padding: 0.5rem;
+}
+
+.reply-form summary:hover {
+  opacity: 0.7;
+}
+
+.reply-form[open] summary {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e0ddd5;
+}
+
+.reply-form form {
+  margin-top: 0;
+}
+
+.reply-form textarea {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+.reply-form input[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Success message */
+.success-message {
+  background: #d4f4dd;
+  color: #002147;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 2px solid #4a7c9e;
+  margin-bottom: 1.5rem;
+  font-weight: 500;
+}

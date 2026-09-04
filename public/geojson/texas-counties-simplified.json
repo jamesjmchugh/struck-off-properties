@@ -1,0 +1,16 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "FIPS": "48201",
+        "NAME": "Harris"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-95.8, 29.5], [-95.8, 30.2], [-95.0, 30.2], [-95.0, 29.5], [-95.8, 29.5]]]
+      }
+    }
+  ]
+}
