@@ -707,8 +707,13 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
 
   const tacSummary = `TAC Contact Information — ${county.tac_name || 'No name'} · ${county.tac_email || 'No email'}`;
 
+  // Generate Wikipedia SVG map URL (if not demo county)
+  const showMap = county.name !== 'AAA-Demo-County';
+  const mapUrl = showMap 
+    ? `https://commons.wikimedia.org/wiki/Special:FilePath/Map_of_Texas_highlighting_${county.name.replace(/\s+/g, '_')}_County.svg`
+    : null;
+
   const content = `
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <div class="container">
       <h2>${county.name} County</h2>
       
@@ -722,8 +727,12 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
         ${county.inventory_received_date ? `<p><strong>Inventory Received:</strong> ${county.inventory_received_date}</p>` : ''}
       </div>
 
+      ${showMap ? `
       <!-- County Locator Map -->
-      <div id="county-locator-map" style="height: 300px; margin: 2rem 0; border-radius: 8px; border: 2px solid #002147;"></div>
+      <div class="county-map">
+        <img src="${mapUrl}" alt="Map of Texas highlighting ${county.name} County" />
+      </div>
+      ` : ''}
       </div>
 
       <h3>Replies / Inbox (${emails.length})</h3>
@@ -807,14 +816,6 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
         localStorage.setItem(storageKey, details.open ? '1' : '0');
       });
     })();
-    </script>
-    
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="/county-locator.js"></script>
-    <script>
-    // Initialize county locator map
-    initCountyLocator('${county.fips}');
     </script>
   `;
   

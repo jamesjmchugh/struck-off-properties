@@ -920,3 +920,17 @@ footer .fine {
   margin: 0;
   color: #002147;
 }
+
+/* County locator map */
+.county-map {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.county-map img {
+  max-width: 100%;
+  height: auto;
+  max-height: 400px;
+  border-radius: 8px;
+  border: 2px solid #002147;
+}
