@@ -377,9 +377,6 @@ app.get('/app/counties', requireAuth, (req, res) => {
     <div class="container-full">
       <h2>All Texas Counties <span class="count-badge" id="count-display">254 of 254</span></h2>
       
-      <!-- Map Container -->
-      <div id="map" style="height: 400px; margin-bottom: 2rem; border-radius: 12px; overflow: hidden;"></div>
-      
       <!-- Controls -->
       <div class="counties-controls">
         <div class="control-row">
@@ -449,10 +446,6 @@ app.get('/app/counties', requireAuth, (req, res) => {
     ${JSON.stringify(counties)}
     </script>
     
-    <!-- Leaflet CSS/JS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <script>
     // Parse data
     const countiesData = JSON.parse(document.getElementById('counties-data').textContent);
@@ -489,7 +482,7 @@ app.get('/app/counties', requireAuth, (req, res) => {
       {id: 'inventory_url', label: 'Inventory / Sale URL', defaultVisible: false},
       {id: 'notes', label: 'Notes', defaultVisible: false},
       {id: 'last_emailed', label: 'Last Emailed', defaultVisible: true},
-      {id: 'last_replied', label: 'Last Replied', defaultVisible: true},
+      {id: 'last_replied', label: 'Last Replied', defaultVisible: false},
       {id: 'next_followup', label: 'Next Follow-up', defaultVisible: true},
       {id: 'inventory_received_date', label: 'Inventory Received', defaultVisible: false}
     ];
@@ -500,74 +493,6 @@ app.get('/app/counties', requireAuth, (req, res) => {
       columns.filter(c => c.defaultVisible).map(c => c.id);
     
     let filteredCounties = [...countiesData];
-    let map, geoJsonLayer;
-    
-    // Status colors (Wild Boar Creek palette)
-    const statusColors = {
-      'Not contacted': '#e9ecef',
-      'Emailed': '#cce5ff',
-      'Replied': '#c8e6f5',
-      'List received': '#d4f4dd',
-      'Offer in play': '#fff3cd',
-      'Closed': '#d6d8db'
-    };
-    
-    // Initialize map
-    function initMap() {
-      map = L.map('map').setView([31.5, -99.5], 6);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-      }).addTo(map);
-      
-      fetch('/geojson/texas-counties.json')
-        .then(r => r.json())
-        .then(geojson => {
-          geoJsonLayer = L.geoJSON(geojson, {
-            style: feature => ({
-              fillColor: getCountyColor(feature.properties.FIPS),
-              fillOpacity: 0.7,
-              color: '#002147',
-              weight: 1
-            }),
-            onEachFeature: (feature, layer) => {
-              const county = countiesData.find(c => c.fips === feature.properties.FIPS);
-              if (county) {
-                layer.bindTooltip(\`\${county.name}: \${county.outreach_status}\`);
-                layer.on('click', () => {
-                  if (isCountyVisible(county)) {
-                    window.location.href = \`/app/county/\${county.id}\`;
-                  }
-                });
-              }
-            }
-          }).addTo(map);
-          updateMapColors();
-        });
-    }
-    
-    function getCountyColor(fips) {
-      const county = countiesData.find(c => c.fips === fips);
-      if (!county) return '#ccc';
-      const visible = isCountyVisible(county);
-      const color = statusColors[county.outreach_status] || '#ccc';
-      return visible ? color : '#f5f5f5';
-    }
-    
-    function isCountyVisible(county) {
-      return filteredCounties.some(c => c.id === county.id);
-    }
-    
-    function updateMapColors() {
-      if (geoJsonLayer) {
-        geoJsonLayer.eachLayer(layer => {
-          const fips = layer.feature.properties.FIPS;
-          layer.setStyle({
-            fillColor: getCountyColor(fips),
-            fillOpacity: isCountyVisible(countiesData.find(c => c.fips === fips)) ? 0.7 : 0.2
-          });
-        });
-      }
-    }
     
     // Render table
     function renderTable() {
@@ -663,7 +588,6 @@ app.get('/app/counties', requireAuth, (req, res) => {
       });
       
       renderTable();
-      updateMapColors();
     }
     
     function matchesDateFilter(dateStr, filter) {
@@ -696,7 +620,6 @@ app.get('/app/counties', requireAuth, (req, res) => {
     document.getElementById('search-column').addEventListener('change', applyFilters);
     
     // Initialize
-    initMap();
     renderColumnPicker();
     renderTable();
     </script>
@@ -785,6 +708,7 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
   const tacSummary = `TAC Contact Information — ${county.tac_name || 'No name'} · ${county.tac_email || 'No email'}`;
 
   const content = `
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <div class="container">
       <h2>${county.name} County</h2>
       
@@ -796,6 +720,10 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
         ${county.last_replied ? `<p><strong>Last Replied:</strong> ${county.last_replied}</p>` : ''}
         ${county.next_followup ? `<p><strong>Next Follow-up:</strong> ${county.next_followup}</p>` : ''}
         ${county.inventory_received_date ? `<p><strong>Inventory Received:</strong> ${county.inventory_received_date}</p>` : ''}
+      </div>
+
+      <!-- County Locator Map -->
+      <div id="county-locator-map" style="height: 300px; margin: 2rem 0; border-radius: 8px; border: 2px solid #002147;"></div>
       </div>
 
       <h3>Replies / Inbox (${emails.length})</h3>
@@ -879,6 +807,14 @@ app.get('/app/county/:id', requireAuth, (req, res) => {
         localStorage.setItem(storageKey, details.open ? '1' : '0');
       });
     })();
+    </script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/county-locator.js"></script>
+    <script>
+    // Initialize county locator map
+    initCountyLocator('${county.fips}');
     </script>
   `;
   
